@@ -1,58 +1,100 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
 import json
-import os
+import uuid
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
-BOOKINGS_FILE = "bookings.json"
+# ---------------- CORS ----------------
 
-if not os.path.exists(BOOKINGS_FILE):
-    with open(BOOKINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump([], f)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def load_bookings():
-    with open(BOOKINGS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_bookings(data):
-    with open(BOOKINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+# ---------------- STATIC ----------------
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# ---------------- FILE ----------------
+
+FILE = "bookings.json"
+
+# ---------------- HELPERS ----------------
+
+def load_bookings():
+    try:
+        with open(FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_bookings(data):
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# ---------------- MODEL ----------------
+
+class Booking(BaseModel):
+    checkin: str
+    checkout: str
+
+# ---------------- INDEX ----------------
+
 @app.get("/")
-async def home():
+async def index():
     return FileResponse("static/index.html")
+
+# ---------------- BUSY DATES ----------------
 
 @app.get("/busy-dates")
 async def busy_dates():
-    return JSONResponse(load_bookings())
-
-@app.post("/book")
-async def book(request: Request):
-
-    data = await request.json()
 
     bookings = load_bookings()
 
-    checkin = data.get("checkin")
-    checkout = data.get("checkout")
+    busy = []
 
-    if not checkin or not checkout:
-        return JSONResponse({
-            "success": False,
-            "message": "Нет дат"
-        })
+    for b in bookings:
 
-    bookings.append({
-        "checkin": checkin,
-        "checkout": checkout
-    })
+        start = datetime.strptime(b["checkin"], "%Y-%m-%d").date()
+        end = datetime.strptime(b["checkout"], "%Y-%m-%d").date()
+
+        current = start
+
+        while current < end:
+
+            busy.append(current.strftime("%Y-%m-%d"))
+
+            current += timedelta(days=1)
+
+    return busy
+
+# ---------------- BOOK ----------------
+
+@app.post("/book")
+async def book(data: Booking):
+
+    bookings = load_bookings()
+
+    booking = {
+        "id": str(uuid.uuid4())[:8],
+        "checkin": data.checkin,
+        "checkout": data.checkout
+    }
+
+    bookings.append(booking)
 
     save_bookings(bookings)
 
-    return JSONResponse({
-        "success": True
-    })
+    return {
+        "success": True,
+        "booking_id": booking["id"]
+    }
