@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Premium Apart</title>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial;
+    background:#f5f5f5;
+}
+
+.header{
+    background:white;
+    padding:20px;
+    font-size:28px;
+    font-weight:bold;
+    text-align:center;
+    box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+
+.container{
+    max-width:500px;
+    margin:auto;
+    padding:20px;
+}
+
+.gallery{
+    display:flex;
+    overflow-x:auto;
+    gap:10px;
+    margin-bottom:20px;
+}
+
+.gallery img{
+    width:300px;
+    height:200px;
+    object-fit:cover;
+    border-radius:16px;
+}
+
+.card{
+    background:white;
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.08);
+}
+
+.title{
+    font-size:26px;
+    font-weight:bold;
+    margin-bottom:10px;
+}
+
+.calendar{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:8px;
+}
+
+.day{
+    background:white;
+    border-radius:12px;
+    padding:14px;
+    text-align:center;
+    cursor:pointer;
+    border:2px solid #eee;
+    transition:0.2s;
+    font-weight:bold;
+}
+
+.day:hover{
+    transform:scale(1.05);
+}
+
+.busy{
+    background:#ff4d4d;
+    color:white;
+    cursor:not-allowed;
+}
+
+.selected{
+    background:#2ecc71;
+    color:white;
+}
+
+.range{
+    background:#95d5b2;
+}
+
+.btn{
+    width:100%;
+    padding:18px;
+    border:none;
+    border-radius:16px;
+    background:black;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+    margin-top:20px;
+    cursor:pointer;
+}
+
+.month{
+    font-size:24px;
+    font-weight:bold;
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.info{
+    margin-top:20px;
+    font-size:18px;
+    text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+Premium Apart
+</div>
+
+<div class="container">
+
+<div class="gallery">
+<img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200">
+<img src="https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200">
+<img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?q=80&w=1200">
+</div>
+
+<div class="card">
+
+<div class="title">
+Выберите даты
+</div>
+
+<div class="month">
+Май 2026
+</div>
+
+<div class="calendar" id="calendar"></div>
+
+<div class="info" id="info"></div>
+
+<button class="btn" onclick="bookDate()">
+Забронировать
+</button>
+
+</div>
+
+</div>
+
+<script>
+
+let checkin = null
+let checkout = null
+let busyDates = []
+
+async function loadBusyDates(){
+
+    const response = await fetch("/busy-dates")
+
+    busyDates = await response.json()
+
+    renderCalendar()
+}
+
+function renderCalendar(){
+
+    const calendar = document.getElementById("calendar")
+
+    calendar.innerHTML = ""
+
+    for(let day=1; day<=31; day++){
+
+        const date =
+        `2026-05-${String(day).padStart(2,'0')}`
+
+        const div = document.createElement("div")
+
+        div.className = "day"
+
+        div.innerText = day
+
+        if(isBusy(date)){
+
+            div.classList.add("busy")
+
+        }else{
+
+            div.onclick = ()=>selectDate(div,date)
+        }
+
+        calendar.appendChild(div)
+    }
+}
+
+function isBusy(date){
+
+    for(let b of busyDates){
+
+        if(date >= b.checkin && date < b.checkout){
+            return true
+        }
+    }
+
+    return false
+}
+
+function selectDate(el,date){
+
+    if(!checkin){
+
+        checkin = date
+
+        el.classList.add("selected")
+
+        document.getElementById("info").innerText =
+        "Заезд: " + checkin
+
+        return
+    }
+
+    if(!checkout){
+
+        if(date <= checkin){
+
+            alert("Дата выезда должна быть позже")
+
+            return
+        }
+
+        checkout = date
+
+        paintRange()
+
+        document.getElementById("info").innerText =
+        `Заезд: ${checkin} | Выезд: ${checkout}`
+
+        return
+    }
+
+    reset()
+
+    selectDate(el,date)
+}
+
+function paintRange(){
+
+    const days = document.querySelectorAll(".day")
+
+    days.forEach((d,index)=>{
+
+        const current =
+        `2026-05-${String(index+1).padStart(2,'0')}`
+
+        if(current >= checkin && current <= checkout){
+
+            d.classList.add("range")
+        }
+    })
+}
+
+function reset(){
+
+    checkin = null
+    checkout = null
+
+    document
+    .querySelectorAll(".day")
+    .forEach(d=>{
+        d.classList.remove("selected")
+        d.classList.remove("range")
+    })
+}
+
+async function bookDate(){
+
+    if(!checkin || !checkout){
+
+        alert("Выберите даты")
+
+        return
+    }
+
+    const response = await fetch("/book",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+            checkin,
+            checkout
+        })
+    })
+
+    const data = await response.json()
+
+    if(data.success){
+
+        alert("Бронь подтверждена")
+
+        location.reload()
+
+    }else{
+
+        alert(data.message)
+    }
+}
+
+loadBusyDates()
+
+</script>
+
+</body>
+</html>
