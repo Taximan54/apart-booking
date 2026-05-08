@@ -5,92 +5,73 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Premium Apart</title>
-
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>ONE APART</title>
 
 <style>
 
-*{
-    box-sizing:border-box;
-}
-
 body{
     margin:0;
-    background:#f3f4f6;
-    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+    font-family:Arial,sans-serif;
+    background:#f5f5f5;
     color:#111;
 }
 
 .header{
-    padding:20px;
     background:white;
-    position:sticky;
-    top:0;
-    z-index:10;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);
-}
-
-.title{
+    padding:20px;
+    text-align:center;
     font-size:28px;
-    font-weight:700;
+    font-weight:bold;
+    box-shadow:0 2px 10px rgba(0,0,0,0.08);
 }
 
-.subtitle{
-    color:#666;
+.sub{
+    font-size:14px;
+    color:#777;
     margin-top:5px;
 }
 
 .container{
-    padding:20px;
-    max-width:700px;
+    max-width:540px;
     margin:auto;
+    padding:20px;
 }
 
 .gallery{
     display:flex;
-    overflow-x:auto;
     gap:12px;
+    overflow-x:auto;
     margin-bottom:20px;
     scroll-snap-type:x mandatory;
 }
 
 .gallery img{
-    width:100%;
-    max-width:320px;
+    width:320px;
     height:220px;
     object-fit:cover;
-    border-radius:22px;
+    border-radius:20px;
+    flex-shrink:0;
     scroll-snap-align:start;
 }
 
 .card{
     background:white;
     border-radius:24px;
-    padding:20px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.08);
+    padding:22px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.06);
 }
 
-.month-nav{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+.title{
+    font-size:24px;
+    font-weight:bold;
     margin-bottom:20px;
 }
 
-.month-btn{
-    border:none;
-    background:#eee;
-    width:42px;
-    height:42px;
-    border-radius:50%;
-    font-size:20px;
-    cursor:pointer;
-}
-
-.month-title{
-    font-size:24px;
-    font-weight:700;
+.month{
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+    margin-bottom:20px;
 }
 
 .weekdays{
@@ -99,8 +80,8 @@ body{
     gap:8px;
     margin-bottom:10px;
     text-align:center;
-    color:#666;
-    font-size:14px;
+    font-size:13px;
+    color:#888;
 }
 
 .calendar{
@@ -110,16 +91,15 @@ body{
 }
 
 .day{
-    aspect-ratio:1;
-    border-radius:16px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:#fafafa;
-    font-weight:600;
+    background:white;
+    border-radius:14px;
+    padding:14px 0;
+    text-align:center;
     cursor:pointer;
+    border:2px solid #eee;
     transition:0.2s;
-    border:2px solid transparent;
+    font-weight:bold;
+    user-select:none;
 }
 
 .day:hover{
@@ -127,55 +107,58 @@ body{
 }
 
 .busy{
-    background:#ff4d4d;
+    background:#ff5c5c;
     color:white;
+    border:none;
     cursor:not-allowed;
-    opacity:0.7;
 }
 
 .selected{
     background:black;
     color:white;
+    border:none;
 }
 
 .range{
-    background:#dbeafe;
-}
-
-.today{
-    border:2px solid black;
+    background:#dcdcdc;
+    color:black;
 }
 
 .info{
-    margin-top:20px;
-    font-size:18px;
+    margin-top:22px;
     text-align:center;
+    font-size:17px;
     line-height:1.6;
 }
 
 .price{
-    font-size:28px;
-    font-weight:bold;
     margin-top:10px;
+    font-size:24px;
+    font-weight:bold;
 }
 
 .btn{
     width:100%;
-    margin-top:20px;
+    margin-top:24px;
     border:none;
-    padding:18px;
-    border-radius:18px;
     background:black;
     color:white;
+    padding:18px;
+    border-radius:18px;
     font-size:18px;
-    font-weight:700;
+    font-weight:bold;
     cursor:pointer;
+    transition:0.2s;
 }
 
-.loader{
+.btn:hover{
+    opacity:0.9;
+}
+
+.loading{
     text-align:center;
-    padding:50px;
-    font-size:20px;
+    padding:30px;
+    font-size:18px;
 }
 
 </style>
@@ -185,8 +168,10 @@ body{
 <body>
 
 <div class="header">
-    <div class="title">Premium Apart</div>
-    <div class="subtitle">Новосибирск • Площадь Калинина</div>
+    ONE APART
+    <div class="sub">
+        Пауза в городе
+    </div>
 </div>
 
 <div class="container">
@@ -199,32 +184,34 @@ body{
 
 <div class="card">
 
-<div class="month-nav">
-    <button class="month-btn" onclick="prevMonth()">‹</button>
-    <div class="month-title" id="monthTitle"></div>
-    <button class="month-btn" onclick="nextMonth()">›</button>
+<div class="title">
+Выберите даты
+</div>
+
+<div class="month">
+Май 2026
 </div>
 
 <div class="weekdays">
-    <div>Пн</div>
-    <div>Вт</div>
-    <div>Ср</div>
-    <div>Чт</div>
-    <div>Пт</div>
-    <div>Сб</div>
-    <div>Вс</div>
+<div>Пн</div>
+<div>Вт</div>
+<div>Ср</div>
+<div>Чт</div>
+<div>Пт</div>
+<div>Сб</div>
+<div>Вс</div>
 </div>
 
-<div id="loader" class="loader">
-    Загрузка дат...
+<div id="loading" class="loading">
+Загрузка дат...
 </div>
 
 <div class="calendar" id="calendar"></div>
 
 <div class="info" id="info"></div>
 
-<button class="btn" onclick="confirmBooking()">
-    Забронировать
+<button class="btn" onclick="bookDate()">
+Забронировать
 </button>
 
 </div>
@@ -233,41 +220,27 @@ body{
 
 <script>
 
-const API = "https://apart-booking-production.up.railway.app"
-
-const tg = window.Telegram.WebApp
-tg.expand()
-
-let busyDates = []
-
 let checkin = null
 let checkout = null
+let busyDates = []
 
-let currentDate = new Date()
-
-const PRICE = 70
-
-const months = [
-"Январь","Февраль","Март","Апрель",
-"Май","Июнь","Июль","Август",
-"Сентябрь","Октябрь","Ноябрь","Декабрь"
-]
+const PRICE_PER_NIGHT = 70
 
 async function loadBusyDates(){
 
     try{
 
-        const response = await fetch(API + "/busy-dates")
+        const response = await fetch("/busy-dates")
 
         busyDates = await response.json()
 
-        document.getElementById("loader").style.display="none"
+        document.getElementById("loading").style.display = "none"
 
         renderCalendar()
 
     }catch(e){
 
-        document.getElementById("loader").innerHTML =
+        document.getElementById("loading").innerHTML =
         "Ошибка загрузки"
 
         console.log(e)
@@ -280,26 +253,10 @@ function renderCalendar(){
 
     calendar.innerHTML = ""
 
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
+    for(let day=1; day<=31; day++){
 
-    document.getElementById("monthTitle").innerText =
-    months[month] + " " + year
-
-    const firstDay = new Date(year,month,1)
-    const lastDay = new Date(year,month+1,0)
-
-    let startDay = firstDay.getDay()
-
-    if(startDay === 0) startDay = 7
-
-    for(let i=1;i<startDay;i++){
-
-        const empty = document.createElement("div")
-        calendar.appendChild(empty)
-    }
-
-    for(let day=1; day<=lastDay.getDate(); day++){
+        const date =
+        `2026-05-${String(day).padStart(2,'0')}`
 
         const div = document.createElement("div")
 
@@ -307,43 +264,13 @@ function renderCalendar(){
 
         div.innerText = day
 
-        const date =
-        `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-
-        const today = new Date()
-
-        const current = new Date(date)
-
-        if(current < new Date(today.toDateString())){
-
-            div.classList.add("busy")
-
-        }else if(isBusy(date)){
+        if(isBusy(date)){
 
             div.classList.add("busy")
 
         }else{
 
             div.onclick = ()=>selectDate(date)
-
-        }
-
-        if(date === formatDate(today)){
-
-            div.classList.add("today")
-        }
-
-        if(checkin === date || checkout === date){
-
-            div.classList.add("selected")
-        }
-
-        if(checkin && checkout){
-
-            if(date > checkin && date < checkout){
-
-                div.classList.add("range")
-            }
         }
 
         calendar.appendChild(div)
@@ -352,7 +279,14 @@ function renderCalendar(){
 
 function isBusy(date){
 
-    return busyDates.includes(date)
+    for(let b of busyDates){
+
+        if(date >= b.checkin && date < b.checkout){
+            return true
+        }
+    }
+
+    return false
 }
 
 function selectDate(date){
@@ -361,27 +295,24 @@ function selectDate(date){
 
         checkin = date
 
-        renderCalendar()
-
-        updateInfo()
+        updateCalendar()
 
         return
     }
 
     if(!checkout){
 
-        if(date <= checkin){
+        if(date < checkin){
 
-            alert("Дата выезда должна быть позже")
+            checkout = checkin
+            checkin = date
 
-            return
+        }else{
+
+            checkout = date
         }
 
-        checkout = date
-
-        renderCalendar()
-
-        updateInfo()
+        updateCalendar()
 
         return
     }
@@ -389,7 +320,36 @@ function selectDate(date){
     checkin = date
     checkout = null
 
-    renderCalendar()
+    updateCalendar()
+}
+
+function updateCalendar(){
+
+    const days = document.querySelectorAll(".day")
+
+    days.forEach((d,index)=>{
+
+        d.classList.remove("selected")
+        d.classList.remove("range")
+
+        const current =
+        `2026-05-${String(index+1).padStart(2,'0')}`
+
+        if(checkin && current === checkin){
+            d.classList.add("selected")
+        }
+
+        if(checkout && current === checkout){
+            d.classList.add("selected")
+        }
+
+        if(checkin && checkout){
+
+            if(current >= checkin && current <= checkout){
+                d.classList.add("range")
+            }
+        }
+    })
 
     updateInfo()
 }
@@ -398,40 +358,35 @@ function updateInfo(){
 
     const info = document.getElementById("info")
 
-    if(checkin && checkout){
-
-        const nights =
-        Math.floor(
-        (new Date(checkout)-new Date(checkin))
-        /1000/60/60/24
-        )
-
-        const total = nights * PRICE
-
-        info.innerHTML = `
-        <div>
-        ${checkin} → ${checkout}
-        </div>
-
-        <div style="margin-top:10px;">
-        ${nights} ночей
-        </div>
-
-        <div class="price">
-        ${total}€
-        </div>
-        `
-    }else if(checkin){
+    if(checkin && !checkout){
 
         info.innerHTML =
-        `Заезд: ${checkin}`
-    }else{
+        `Заезд:<br><b>${checkin}</b>`
 
-        info.innerHTML = ""
+        return
+    }
+
+    if(checkin && checkout){
+
+        const start = new Date(checkin)
+        const end = new Date(checkout)
+
+        const nights =
+        (end - start) / (1000*60*60*24)
+
+        const total =
+        nights * PRICE_PER_NIGHT
+
+        info.innerHTML = `
+        Заезд: <b>${checkin}</b><br>
+        Выезд: <b>${checkout}</b><br>
+        Ночей: <b>${nights}</b>
+        <div class="price">${total}€</div>
+        `
     }
 }
 
-async function confirmBooking(){
+async function bookDate(){
 
     if(!checkin || !checkout){
 
@@ -440,60 +395,32 @@ async function confirmBooking(){
         return
     }
 
-    try{
+    const response = await fetch("/book",{
 
-        const response = await fetch(API + "/book",{
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body:JSON.stringify({
-                checkin,
-                checkout
-            })
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+            checkin,
+            checkout
         })
+    })
 
-        const data = await response.json()
+    const data = await response.json()
 
-        if(data.success){
+    if(data.success){
 
-            tg.sendData(JSON.stringify({
-                checkin,
-                checkout
-            }))
+        alert("Бронь подтверждена")
 
-            alert("Бронь подтверждена")
+        location.reload()
 
-            tg.close()
+    }else{
 
-        }else{
-
-            alert(data.message)
-        }
-
-    }catch(e){
-
-        alert("Ошибка бронирования")
+        alert(data.message)
     }
-}
-
-function prevMonth(){
-
-    currentDate.setMonth(currentDate.getMonth()-1)
-
-    renderCalendar()
-}
-
-function nextMonth(){
-
-    currentDate.setMonth(currentDate.getMonth()+1)
-
-    renderCalendar()
-}
-
-function formatDate(date){
-
-    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
 loadBusyDates()
