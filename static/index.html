@@ -12,94 +12,108 @@
 body{
     margin:0;
     font-family:Arial,sans-serif;
-    background:#f5f5f5;
+    background:#f3f3f3;
     color:#111;
 }
 
 .header{
     background:white;
-    padding:20px;
-    text-align:center;
-    font-size:28px;
+    padding:24px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}
+
+.logo{
+    font-size:34px;
     font-weight:bold;
-    box-shadow:0 2px 10px rgba(0,0,0,0.08);
 }
 
 .sub{
-    font-size:14px;
+    margin-top:6px;
     color:#777;
-    margin-top:5px;
+    font-size:15px;
 }
 
 .container{
-    max-width:540px;
+    max-width:560px;
     margin:auto;
     padding:20px;
 }
 
 .gallery{
     display:flex;
-    gap:12px;
+    gap:14px;
     overflow-x:auto;
     margin-bottom:20px;
     scroll-snap-type:x mandatory;
 }
 
 .gallery img{
-    width:320px;
-    height:220px;
+    width:100%;
+    max-width:500px;
+    height:300px;
     object-fit:cover;
-    border-radius:20px;
+    border-radius:24px;
     flex-shrink:0;
     scroll-snap-align:start;
 }
 
 .card{
     background:white;
-    border-radius:24px;
-    padding:22px;
+    border-radius:28px;
+    padding:24px;
     box-shadow:0 4px 20px rgba(0,0,0,0.06);
 }
 
-.title{
-    font-size:24px;
-    font-weight:bold;
+.calendar-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
     margin-bottom:20px;
 }
 
 .month{
-    text-align:center;
-    font-size:22px;
+    font-size:30px;
     font-weight:bold;
-    margin-bottom:20px;
+}
+
+.nav{
+    width:52px;
+    height:52px;
+    border-radius:50%;
+    border:none;
+    background:#f0f0f0;
+    font-size:24px;
+    cursor:pointer;
 }
 
 .weekdays{
     display:grid;
     grid-template-columns:repeat(7,1fr);
-    gap:8px;
-    margin-bottom:10px;
+    gap:10px;
+    margin-bottom:14px;
     text-align:center;
-    font-size:13px;
-    color:#888;
+    color:#777;
+    font-size:14px;
 }
 
 .calendar{
     display:grid;
     grid-template-columns:repeat(7,1fr);
-    gap:8px;
+    gap:10px;
 }
 
 .day{
+    aspect-ratio:1;
+    border-radius:18px;
     background:white;
-    border-radius:14px;
-    padding:14px 0;
-    text-align:center;
-    cursor:pointer;
     border:2px solid #eee;
-    transition:0.2s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     font-weight:bold;
-    user-select:none;
+    cursor:pointer;
+    transition:0.2s;
+    font-size:18px;
 }
 
 .day:hover{
@@ -107,7 +121,7 @@ body{
 }
 
 .busy{
-    background:#ff5c5c;
+    background:#ff6b6b;
     color:white;
     border:none;
     cursor:not-allowed;
@@ -120,44 +134,72 @@ body{
 }
 
 .range{
-    background:#dcdcdc;
-    color:black;
+    background:#d9d9d9;
 }
 
 .info{
-    margin-top:22px;
+    margin-top:26px;
     text-align:center;
-    font-size:17px;
-    line-height:1.6;
+    line-height:1.7;
+    font-size:18px;
 }
 
 .price{
-    margin-top:10px;
-    font-size:24px;
+    font-size:42px;
     font-weight:bold;
+    margin-top:16px;
 }
 
 .btn{
     width:100%;
+    margin-top:30px;
+    border:none;
+    border-radius:22px;
+    padding:22px;
+    background:black;
+    color:white;
+    font-size:22px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.success{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.7);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:999;
+}
+
+.success-box{
+    background:white;
+    width:90%;
+    max-width:420px;
+    border-radius:28px;
+    padding:34px;
+    text-align:center;
+}
+
+.success-title{
+    font-size:32px;
+    font-weight:bold;
+    margin-bottom:20px;
+}
+
+.success-text{
+    font-size:20px;
+    line-height:1.7;
+}
+
+.close{
     margin-top:24px;
     border:none;
     background:black;
     color:white;
-    padding:18px;
-    border-radius:18px;
-    font-size:18px;
-    font-weight:bold;
-    cursor:pointer;
-    transition:0.2s;
-}
-
-.btn:hover{
-    opacity:0.9;
-}
-
-.loading{
-    text-align:center;
-    padding:30px;
+    padding:16px 30px;
+    border-radius:16px;
     font-size:18px;
 }
 
@@ -168,31 +210,43 @@ body{
 <body>
 
 <div class="header">
-    ONE APART
-    <div class="sub">
-        Пауза в городе
-    </div>
+
+<div class="logo">
+ONE APART
+</div>
+
+<div class="sub">
+Пауза в городе • Новосибирск
+</div>
+
 </div>
 
 <div class="container">
 
 <div class="gallery">
-    <img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200">
-    <img src="https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200">
-    <img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?q=80&w=1200">
+
+<img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200">
+
+<img src="https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1200">
+
+<img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?q=80&w=1200">
+
 </div>
 
 <div class="card">
 
-<div class="title">
-Выберите даты
-</div>
+<div class="calendar-header">
 
-<div class="month">
-Май 2026
+<button class="nav" onclick="prevMonth()">‹</button>
+
+<div class="month" id="monthName"></div>
+
+<button class="nav" onclick="nextMonth()">›</button>
+
 </div>
 
 <div class="weekdays">
+
 <div>Пн</div>
 <div>Вт</div>
 <div>Ср</div>
@@ -200,10 +254,7 @@ body{
 <div>Пт</div>
 <div>Сб</div>
 <div>Вс</div>
-</div>
 
-<div id="loading" class="loading">
-Загрузка дат...
 </div>
 
 <div class="calendar" id="calendar"></div>
@@ -218,47 +269,82 @@ body{
 
 </div>
 
+<div class="success" id="success">
+
+<div class="success-box">
+
+<div class="success-title">
+Бронь подтверждена
+</div>
+
+<div class="success-text" id="successText"></div>
+
+<button class="close" onclick="closeSuccess()">
+Закрыть
+</button>
+
+</div>
+
+</div>
+
 <script>
+
+let busyDates = []
 
 let checkin = null
 let checkout = null
-let busyDates = []
 
-const PRICE_PER_NIGHT = 70
+let currentMonth = 4
+let currentYear = 2026
+
+const PRICE = 70
+
+const monthNames = [
+"Январь",
+"Февраль",
+"Март",
+"Апрель",
+"Май",
+"Июнь",
+"Июль",
+"Август",
+"Сентябрь",
+"Октябрь",
+"Ноябрь",
+"Декабрь"
+]
 
 async function loadBusyDates(){
 
-    try{
+    const response =
+    await fetch("/busy-dates")
 
-        const response = await fetch("/busy-dates")
+    busyDates =
+    await response.json()
 
-        busyDates = await response.json()
-
-        document.getElementById("loading").style.display = "none"
-
-        renderCalendar()
-
-    }catch(e){
-
-        document.getElementById("loading").innerHTML =
-        "Ошибка загрузки"
-
-        console.log(e)
-    }
+    renderCalendar()
 }
 
 function renderCalendar(){
 
-    const calendar = document.getElementById("calendar")
+    const calendar =
+    document.getElementById("calendar")
 
     calendar.innerHTML = ""
 
-    for(let day=1; day<=31; day++){
+    document.getElementById("monthName").innerText =
+    `${monthNames[currentMonth]} ${currentYear}`
+
+    const daysInMonth =
+    new Date(currentYear,currentMonth+1,0).getDate()
+
+    for(let day=1; day<=daysInMonth; day++){
 
         const date =
-        `2026-05-${String(day).padStart(2,'0')}`
+        `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
 
-        const div = document.createElement("div")
+        const div =
+        document.createElement("div")
 
         div.className = "day"
 
@@ -273,15 +359,35 @@ function renderCalendar(){
             div.onclick = ()=>selectDate(date)
         }
 
+        if(checkin && date===checkin){
+
+            div.classList.add("selected")
+        }
+
+        if(checkout && date===checkout){
+
+            div.classList.add("selected")
+        }
+
+        if(checkin && checkout){
+
+            if(date >= checkin && date <= checkout){
+
+                div.classList.add("range")
+            }
+        }
+
         calendar.appendChild(div)
     }
+
+    updateInfo()
 }
 
 function isBusy(date){
 
     for(let b of busyDates){
 
-        if(date >= b.checkin && date < b.checkout){
+        if(date < b.checkout && date >= b.checkin){
             return true
         }
     }
@@ -295,7 +401,7 @@ function selectDate(date){
 
         checkin = date
 
-        updateCalendar()
+        renderCalendar()
 
         return
     }
@@ -312,7 +418,7 @@ function selectDate(date){
             checkout = date
         }
 
-        updateCalendar()
+        renderCalendar()
 
         return
     }
@@ -320,43 +426,13 @@ function selectDate(date){
     checkin = date
     checkout = null
 
-    updateCalendar()
-}
-
-function updateCalendar(){
-
-    const days = document.querySelectorAll(".day")
-
-    days.forEach((d,index)=>{
-
-        d.classList.remove("selected")
-        d.classList.remove("range")
-
-        const current =
-        `2026-05-${String(index+1).padStart(2,'0')}`
-
-        if(checkin && current === checkin){
-            d.classList.add("selected")
-        }
-
-        if(checkout && current === checkout){
-            d.classList.add("selected")
-        }
-
-        if(checkin && checkout){
-
-            if(current >= checkin && current <= checkout){
-                d.classList.add("range")
-            }
-        }
-    })
-
-    updateInfo()
+    renderCalendar()
 }
 
 function updateInfo(){
 
-    const info = document.getElementById("info")
+    const info =
+    document.getElementById("info")
 
     if(checkin && !checkout){
 
@@ -368,22 +444,55 @@ function updateInfo(){
 
     if(checkin && checkout){
 
-        const start = new Date(checkin)
-        const end = new Date(checkout)
+        const start =
+        new Date(checkin)
+
+        const end =
+        new Date(checkout)
 
         const nights =
-        (end - start) / (1000*60*60*24)
+        (end-start)/(1000*60*60*24)
 
         const total =
-        nights * PRICE_PER_NIGHT
+        nights * PRICE
 
-        info.innerHTML = `
+        info.innerHTML =
+        `
         Заезд: <b>${checkin}</b><br>
         Выезд: <b>${checkout}</b><br>
         Ночей: <b>${nights}</b>
-        <div class="price">${total}€</div>
+
+        <div class="price">
+        ${total}€
+        </div>
         `
     }
+}
+
+function prevMonth(){
+
+    currentMonth--
+
+    if(currentMonth < 0){
+
+        currentMonth = 11
+        currentYear--
+    }
+
+    renderCalendar()
+}
+
+function nextMonth(){
+
+    currentMonth++
+
+    if(currentMonth > 11){
+
+        currentMonth = 0
+        currentYear++
+    }
+
+    renderCalendar()
 }
 
 async function bookDate(){
@@ -395,7 +504,8 @@ async function bookDate(){
         return
     }
 
-    const response = await fetch("/book",{
+    const response =
+    await fetch("/book",{
 
         method:"POST",
 
@@ -409,18 +519,33 @@ async function bookDate(){
         })
     })
 
-    const data = await response.json()
+    const data =
+    await response.json()
 
     if(data.success){
 
-        alert("Бронь подтверждена")
+        document.getElementById("success").style.display =
+        "flex"
 
-        location.reload()
+        document.getElementById("successText").innerHTML =
+        `
+        ID брони: <b>${data.booking_id}</b><br><br>
+        ${checkin} → ${checkout}<br>
+        ${data.nights} ночей<br><br>
+        <b>${data.total}€</b>
+        `
+
+        loadBusyDates()
 
     }else{
 
         alert(data.message)
     }
+}
+
+function closeSuccess(){
+
+    location.reload()
 }
 
 loadBusyDates()
