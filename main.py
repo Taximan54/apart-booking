@@ -1,10 +1,8 @@
 import asyncio
 import sqlite3
 import uuid
-import requests
 
 from datetime import datetime
-from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
@@ -13,11 +11,16 @@ from pydantic import BaseModel
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery
+)
 
-# =========================================
+# =====================================================
 # CONFIG
-# =========================================
+# =====================================================
 
 BOT_TOKEN = "8770383990:AAGzExWz3WYCNYcEaV39lzrIx2SGQFyOqlA"
 
@@ -28,31 +31,31 @@ ADMIN_IDS = [
 
 PRICE_PER_NIGHT = 70
 
-DB = "bookings.db"
+DB_NAME = "bookings.db"
 
-# =========================================
+# =====================================================
 # FASTAPI
-# =========================================
+# =====================================================
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# =========================================
+# =====================================================
 # TELEGRAM
-# =========================================
+# =====================================================
 
 bot = Bot(token=BOT_TOKEN)
 
 dp = Dispatcher()
 
-# =========================================
+# =====================================================
 # DATABASE
-# =========================================
+# =====================================================
 
 def init_db():
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
@@ -73,13 +76,17 @@ def init_db():
 
 init_db()
 
-# =========================================
+# =====================================================
 # HELPERS
-# =========================================
+# =====================================================
+
+def is_admin(user_id):
+
+    return user_id in ADMIN_IDS
 
 def get_all_bookings():
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
@@ -107,7 +114,7 @@ def get_all_bookings():
 
     return bookings
 
-def booking_conflict(checkin, checkout):
+def has_conflict(checkin, checkout):
 
     bookings = get_all_bookings()
 
@@ -136,7 +143,7 @@ def create_booking(checkin, checkout):
 
     booking_id = str(uuid.uuid4())[:8]
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
@@ -164,7 +171,7 @@ def create_booking(checkin, checkout):
 
 def delete_booking(booking_id):
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
@@ -185,9 +192,15 @@ def revenue_stats():
 
     bookings = get_all_bookings()
 
-    total_revenue = sum(b["total"] for b in bookings)
+    total_revenue = sum(
+        booking["total"]
+        for booking in bookings
+    )
 
-    total_nights = sum(b["nights"] for b in bookings)
+    total_nights = sum(
+        booking["nights"]
+        for booking in bookings
+    )
 
     total_bookings = len(bookings)
 
@@ -203,34 +216,38 @@ async def notify_admins(text):
 
         try:
 
-            await bot.send_message(admin_id, text)
+            await bot.send_message(
+                admin_id,
+                text
+            )
 
         except:
             pass
 
-# =========================================
+# =====================================================
 # MODELS
-# =========================================
+# =====================================================
 
 class BookingRequest(BaseModel):
+
     checkin: str
     checkout: str
 
-# =========================================
+# =====================================================
 # WEB ROUTES
-# =========================================
+# =====================================================
 
 @app.get("/")
 async def home():
 
-    return FileResponse("static/index.html")
+    return FileResponse(
+        "static/index.html"
+    )
 
 @app.get("/busy-dates")
 async def busy_dates():
 
-    bookings = get_all_bookings()
-
-    return bookings
+    return get_all_bookings()
 
 @app.post("/book")
 async def book(data: BookingRequest):
@@ -245,29 +262,36 @@ async def book(data: BookingRequest):
         "%Y-%m-%d"
     ).date()
 
-    if checkout <= checkin:
+    # reverse selection fix
+    if checkin > checkout:
+
+        checkin, checkout = checkout, checkin
+
+    if checkin == checkout:
 
         return JSONResponse({
             "success": False,
-            "message": "Неверные даты"
+            "message": "Минимум 1 ночь"
         })
 
-    if booking_conflict(checkin, checkout):
+    if has_conflict(checkin, checkout):
 
         return JSONResponse({
             "success": False,
-            "message": "Даты уже заняты"
+            "message": "Даты заняты"
         })
 
-    booking = create_booking(checkin, checkout)
+    booking = create_booking(
+        checkin,
+        checkout
+    )
 
     await notify_admins(
         f"🔥 НОВАЯ БРОНЬ\n\n"
         f"ID: {booking['id']}\n"
-        f"Заезд: {checkin}\n"
-        f"Выезд: {checkout}\n"
-        f"Ночей: {booking['nights']}\n"
-        f"Сумма: {booking['total']}€"
+        f"📅 {checkin} → {checkout}\n"
+        f"🌙 {booking['nights']} ночей\n"
+        f"💰 {booking['total']}€"
     )
 
     return {
@@ -277,127 +301,218 @@ async def book(data: BookingRequest):
         "total": booking["total"]
     }
 
-# =========================================
-# TELEGRAM ADMIN PANEL
-# =========================================
+# =====================================================
+# TELEGRAM CRM UI
+# =====================================================
 
-def is_admin(user_id):
+def admin_menu():
 
-    return user_id in ADMIN_IDS
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="📅 Брони",
+                    callback_data="bookings"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="💰 Статистика",
+                    callback_data="stats"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🔄 Обновить",
+                    callback_data="refresh"
+                )
+            ]
+        ]
+    )
+
+def booking_keyboard(booking_id):
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="❌ Удалить",
+                    callback_data=f"delete_{booking_id}"
+                )
+            ]
+        ]
+    )
+
+# =====================================================
+# START
+# =====================================================
 
 @dp.message(Command("start"))
 async def start(message: Message):
 
-    if is_admin(message.from_user.id):
-
-        await message.answer(
-            "✅ ADMIN PANEL\n\n"
-            "/bookings — все брони\n"
-            "/stats — статистика\n"
-            "/delete ID — удалить бронь"
-        )
-
-    else:
-
-        await message.answer(
-            "ONE APART 🏠"
-        )
-
-@dp.message(Command("bookings"))
-async def bookings(message: Message):
-
-    if not is_admin(message.from_user.id):
+    if not is_admin(
+        message.from_user.id
+    ):
         return
-
-    data = get_all_bookings()
-
-    if not data:
-
-        await message.answer("Броней нет")
-
-        return
-
-    text = "📅 ВСЕ БРОНИ\n\n"
-
-    for b in data:
-
-        text += (
-            f"ID: {b['id']}\n"
-            f"{b['checkin']} → {b['checkout']}\n"
-            f"{b['nights']} ночей\n"
-            f"{b['total']}€\n\n"
-        )
-
-    await message.answer(text)
-
-@dp.message(Command("stats"))
-async def stats(message: Message):
-
-    if not is_admin(message.from_user.id):
-        return
-
-    stats_data = revenue_stats()
 
     await message.answer(
-        f"📊 СТАТИСТИКА\n\n"
-        f"Броней: {stats_data['bookings']}\n"
-        f"Ночей: {stats_data['nights']}\n"
-        f"Доход: {stats_data['revenue']}€"
+        "🏠 ONE APART ADMIN",
+        reply_markup=admin_menu()
     )
 
-@dp.message(Command("delete"))
-async def delete(message: Message):
+# =====================================================
+# BOOKINGS
+# =====================================================
 
-    if not is_admin(message.from_user.id):
+@dp.callback_query(
+    lambda c: c.data == "bookings"
+)
+async def bookings_callback(
+    callback: CallbackQuery
+):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
         return
 
-    parts = message.text.split()
+    bookings = get_all_bookings()
 
-    if len(parts) != 2:
+    if not bookings:
 
-        await message.answer(
-            "Использование:\n/delete ID"
+        await callback.message.answer(
+            "Броней нет"
         )
 
         return
 
-    booking_id = parts[1]
+    for booking in bookings:
 
-    success = delete_booking(booking_id)
+        text = (
+            f"🏠 Бронь #{booking['id']}\n\n"
+            f"📅 {booking['checkin']} → "
+            f"{booking['checkout']}\n"
+            f"🌙 {booking['nights']} ночей\n"
+            f"💰 {booking['total']}€"
+        )
+
+        await callback.message.answer(
+            text,
+            reply_markup=booking_keyboard(
+                booking["id"]
+            )
+        )
+
+# =====================================================
+# STATS
+# =====================================================
+
+@dp.callback_query(
+    lambda c: c.data == "stats"
+)
+async def stats_callback(
+    callback: CallbackQuery
+):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+        return
+
+    stats = revenue_stats()
+
+    await callback.message.answer(
+        f"📊 СТАТИСТИКА\n\n"
+        f"📅 Броней: {stats['bookings']}\n"
+        f"🌙 Ночей: {stats['nights']}\n"
+        f"💰 Доход: {stats['revenue']}€"
+    )
+
+# =====================================================
+# DELETE BOOKING
+# =====================================================
+
+@dp.callback_query(
+    lambda c: c.data.startswith(
+        "delete_"
+    )
+)
+async def delete_callback(
+    callback: CallbackQuery
+):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+        return
+
+    booking_id = callback.data.replace(
+        "delete_",
+        ""
+    )
+
+    success = delete_booking(
+        booking_id
+    )
 
     if success:
 
-        await message.answer(
-            f"✅ Бронь {booking_id} удалена"
+        await callback.message.edit_text(
+            f"❌ Бронь {booking_id} удалена"
         )
 
     else:
 
-        await message.answer(
-            "❌ Бронь не найдена"
+        await callback.message.answer(
+            "Ошибка удаления"
         )
 
-# =========================================
-# RUN BOT
-# =========================================
+# =====================================================
+# REFRESH
+# =====================================================
+
+@dp.callback_query(
+    lambda c: c.data == "refresh"
+)
+async def refresh_callback(
+    callback: CallbackQuery
+):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+        return
+
+    await callback.message.answer(
+        "✅ Данные обновлены",
+        reply_markup=admin_menu()
+    )
+
+# =====================================================
+# BOT STARTUP
+# =====================================================
 
 async def start_bot():
 
-    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.delete_webhook(
+        drop_pending_updates=True
+    )
 
     await dp.start_polling(bot)
 
-def run_bot():
-
-    asyncio.run(start_bot())
-
-# =========================================
-# STARTUP
-# =========================================
+# =====================================================
+# FASTAPI STARTUP
+# =====================================================
 
 @app.on_event("startup")
 async def startup_event():
 
     loop = asyncio.get_event_loop()
 
-    loop.create_task(start_bot())
+    loop.create_task(
+        start_bot()
+    )
