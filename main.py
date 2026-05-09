@@ -25,8 +25,8 @@ from aiogram.types import (
 BOT_TOKEN = "8770383990:AAGzExWz3WYCNYcEaV39lzrIx2SGQFyOqlA"
 
 ADMIN_IDS = [
-    "1008661058",
-    "1220835758"
+    1008661058,
+    1220835758
 ]
 
 PRICE_PER_NIGHT = 70
@@ -49,7 +49,7 @@ app.mount(
 # TELEGRAM
 # ==================================================
 
-bot = Bot(BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN)
 
 dp = Dispatcher()
 
@@ -86,7 +86,7 @@ init_db()
 
 def is_admin(user_id):
 
-    return str(user_id) in ADMIN_IDS
+    return int(user_id) in ADMIN_IDS
 
 def get_bookings():
 
@@ -103,11 +103,11 @@ def get_bookings():
 
     conn.close()
 
-    result = []
+    bookings = []
 
     for row in rows:
 
-        result.append({
+        bookings.append({
             "id": row[0],
             "checkin": row[1],
             "checkout": row[2],
@@ -116,7 +116,7 @@ def get_bookings():
             "created_at": row[5]
         })
 
-    return result
+    return bookings
 
 def has_conflict(checkin, checkout):
 
@@ -197,13 +197,13 @@ def stats():
     bookings = get_bookings()
 
     revenue = sum(
-        b["total"]
-        for b in bookings
+        booking["total"]
+        for booking in bookings
     )
 
     nights = sum(
-        b["nights"]
-        for b in bookings
+        booking["nights"]
+        for booking in bookings
     )
 
     return {
@@ -250,7 +250,6 @@ async def book(data: BookingRequest):
         "%Y-%m-%d"
     ).date()
 
-    # reverse dates fix
     if checkin > checkout:
 
         checkin, checkout = checkout, checkin
@@ -295,7 +294,7 @@ async def book(data: BookingRequest):
     }
 
 # ==================================================
-# TELEGRAM UI
+# KEYBOARDS
 # ==================================================
 
 def admin_keyboard():
@@ -327,7 +326,7 @@ def booking_keyboard(booking_id):
             [
                 InlineKeyboardButton(
                     text="❌ Удалить",
-                    callback_data=f"delete:{booking_id}"
+                    callback_data=f"delete_{booking_id}"
                 )
             ]
         ]
@@ -343,10 +342,15 @@ async def start(message: Message):
     if not is_admin(
         message.from_user.id
     ):
+
+        await message.answer(
+            "У вас нет доступа"
+        )
+
         return
 
     await message.answer(
-        "🏠 ONE APART ADMIN",
+        text="🏠 ONE APART ADMIN",
         reply_markup=admin_keyboard()
     )
 
@@ -433,12 +437,12 @@ async def stats_callback(
     await callback.answer()
 
 # ==================================================
-# DELETE BOOKING
+# DELETE
 # ==================================================
 
 @dp.callback_query(
     lambda c: c.data.startswith(
-        "delete:"
+        "delete_"
     )
 )
 async def delete_callback(
@@ -456,7 +460,10 @@ async def delete_callback(
 
         return
 
-    booking_id = callback.data.split(":")[1]
+    booking_id = callback.data.replace(
+        "delete_",
+        ""
+    )
 
     success = delete_booking(
         booking_id
