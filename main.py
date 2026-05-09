@@ -398,4 +398,6 @@ def run_bot():
 @app.on_event("startup")
 async def startup_event():
 
-    Thread(target=run_bot).start()
+    loop = asyncio.get_event_loop()
+
+    loop.create_task(start_bot())
