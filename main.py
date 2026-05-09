@@ -25,10 +25,9 @@ from aiogram.types import (
 BOT_TOKEN = "8770383990:AAGzExWz3WYCNYcEaV39lzrIx2SGQFyOqlA"
 
 ADMIN_IDS = [
-    1008661058,
-    1220835758
+    "1008661058",
+    "1220835758"
 ]
-
 PRICE_PER_NIGHT = 70
 
 DB_NAME = "bookings.db"
@@ -86,7 +85,7 @@ init_db()
 
 def is_admin(user_id):
 
-    return user_id in ADMIN_IDS
+    return str(user_id) in ADMIN_IDS
 
 def get_bookings():
 
