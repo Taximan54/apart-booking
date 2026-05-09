@@ -28,6 +28,7 @@ ADMIN_IDS = [
     "1008661058",
     "1220835758"
 ]
+
 PRICE_PER_NIGHT = 70
 
 DB_NAME = "bookings.db"
@@ -249,7 +250,7 @@ async def book(data: BookingRequest):
         "%Y-%m-%d"
     ).date()
 
-    # reverse selection
+    # reverse dates fix
     if checkin > checkout:
 
         checkin, checkout = checkout, checkin
@@ -360,6 +361,17 @@ async def bookings_callback(
     callback: CallbackQuery
 ):
 
+    if not is_admin(
+        callback.from_user.id
+    ):
+
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+
+        return
+
     bookings = get_bookings()
 
     if not bookings:
@@ -367,6 +379,8 @@ async def bookings_callback(
         await callback.message.answer(
             "Броней пока нет"
         )
+
+        await callback.answer()
 
         return
 
@@ -383,6 +397,8 @@ async def bookings_callback(
             )
         )
 
+    await callback.answer()
+
 # ==================================================
 # STATS
 # ==================================================
@@ -394,6 +410,17 @@ async def stats_callback(
     callback: CallbackQuery
 ):
 
+    if not is_admin(
+        callback.from_user.id
+    ):
+
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+
+        return
+
     s = stats()
 
     await callback.message.answer(
@@ -403,8 +430,10 @@ async def stats_callback(
         f"💰 Доход: {s['revenue']}€"
     )
 
+    await callback.answer()
+
 # ==================================================
-# DELETE
+# DELETE BOOKING
 # ==================================================
 
 @dp.callback_query(
@@ -415,6 +444,17 @@ async def stats_callback(
 async def delete_callback(
     callback: CallbackQuery
 ):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+
+        return
 
     booking_id = callback.data.split(":")[1]
 
@@ -433,6 +473,8 @@ async def delete_callback(
         await callback.message.answer(
             "Ошибка удаления"
         )
+
+    await callback.answer()
 
 # ==================================================
 # STARTUP
