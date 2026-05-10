@@ -52,7 +52,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # =====================================================
 
 bot = Bot(token=BOT_TOKEN)
-print(BOT_TOKEN)
+print(repr(BOT_TOKEN))
 dp = Dispatcher()
 
 # =====================================================
