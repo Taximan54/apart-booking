@@ -1094,7 +1094,354 @@ async def start_bot():
 # =====================================================
 # FASTAPI STARTUP
 # =====================================================
+# =====================================================
+# АДМИНКА
+# =====================================================
 
+admin_state = {}
+
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
+
+# =====================================================
+# КНОПКА АДМИНКИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "🛠 Админка")
+async def admin_panel(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    keyboard = ReplyKeyboardMarkup(
+
+        keyboard=[
+
+            [
+                KeyboardButton(text="📋 Все брони"),
+                KeyboardButton(text="📊 Статистика")
+            ],
+
+            [
+                KeyboardButton(text="❌ Удалить бронь"),
+                KeyboardButton(text="📅 Заблокировать даты")
+            ],
+
+            [
+                KeyboardButton(text="🔓 Разблокировать даты"),
+                KeyboardButton(text="💰 Изменить цену")
+            ],
+
+            [
+                KeyboardButton(text="👤 Клиенты"),
+                KeyboardButton(text="💬 Рассылка")
+            ],
+
+            [
+                KeyboardButton(text="📈 Доход"),
+                KeyboardButton(text="🕒 Последние брони")
+            ],
+
+            [
+                KeyboardButton(text="🧹 Очистить брони")
+            ]
+
+        ],
+
+        resize_keyboard=True
+    )
+
+    await message.answer(
+        "⚙️ Панель администратора",
+        reply_markup=keyboard
+    )
+
+# =====================================================
+# ВСЕ БРОНИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "📋 Все брони")
+async def all_bookings(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    if not bookings:
+        await message.answer("Броней пока нет")
+        return
+
+    text = "📋 ВСЕ БРОНИ\n\n"
+
+    for b in bookings:
+
+        text += f"""
+ID: {b['id']}
+
+📅 {b['checkin']} → {b['checkout']}
+🌙 Ночей: {b['nights']}
+💰 Сумма: {b['total']}€
+
+-------------------
+"""
+
+    await message.answer(text)
+
+# =====================================================
+# СТАТИСТИКА
+# =====================================================
+
+@dp.message(lambda m: m.text == "📊 Статистика")
+async def stats(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    total_bookings = len(bookings)
+
+    total_income = sum(
+        b.get("total", 0)
+        for b in bookings
+    )
+
+    total_nights = sum(
+        b.get("nights", 0)
+        for b in bookings
+    )
+
+    await message.answer(
+        f"""
+📊 СТАТИСТИКА
+
+📋 Броней: {total_bookings}
+
+🌙 Ночей: {total_nights}
+
+💰 Доход: {total_income}€
+"""
+    )
+
+# =====================================================
+# ДОХОД
+# =====================================================
+
+@dp.message(lambda m: m.text == "📈 Доход")
+async def income(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    total_income = sum(
+        b.get("total", 0)
+        for b in bookings
+    )
+
+    await message.answer(
+        f"💰 Общий доход: {total_income}€"
+    )
+
+# =====================================================
+# ПОСЛЕДНИЕ БРОНИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "🕒 Последние брони")
+async def latest_bookings(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    if not bookings:
+        await message.answer("Нет броней")
+        return
+
+    latest = bookings[-5:]
+
+    text = "🕒 ПОСЛЕДНИЕ БРОНИ\n\n"
+
+    for b in latest:
+
+        text += f"""
+ID: {b['id']}
+
+📅 {b['checkin']} → {b['checkout']}
+💰 {b['total']}€
+
+-------------------
+"""
+
+    await message.answer(text)
+
+# =====================================================
+# КЛИЕНТЫ
+# =====================================================
+
+@dp.message(lambda m: m.text == "👤 Клиенты")
+async def clients(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    total = len(bookings)
+
+    await message.answer(
+        f"👤 Всего клиентов: {total}"
+    )
+
+# =====================================================
+# РАССЫЛКА
+# =====================================================
+
+@dp.message(lambda m: m.text == "💬 Рассылка")
+async def mailing(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    admin_state[message.from_user.id] = "mailing"
+
+    await message.answer(
+        "Введите текст рассылки"
+    )
+
+@dp.message(lambda m: admin_state.get(m.from_user.id) == "mailing")
+async def process_mailing(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    bookings = load_bookings()
+
+    sent = 0
+
+    for b in bookings:
+
+        user_id = b.get("user_id")
+
+        if user_id:
+
+            try:
+
+                await bot.send_message(
+                    user_id,
+                    message.text
+                )
+
+                sent += 1
+
+            except:
+                pass
+
+    admin_state.pop(message.from_user.id, None)
+
+    await message.answer(
+        f"✅ Рассылка завершена\nОтправлено: {sent}"
+    )
+
+# =====================================================
+# УДАЛЕНИЕ БРОНИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "❌ Удалить бронь")
+async def delete_booking(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    admin_state[message.from_user.id] = "delete_booking"
+
+    await message.answer(
+        "Введите ID брони"
+    )
+
+@dp.message(lambda m: admin_state.get(m.from_user.id) == "delete_booking")
+async def process_delete(message: types.Message):
+
+    bookings = load_bookings()
+
+    booking_id = message.text.strip()
+
+    new_bookings = [
+        b for b in bookings
+        if b["id"] != booking_id
+    ]
+
+    if len(new_bookings) == len(bookings):
+
+        await message.answer(
+            "❌ Бронь не найдена"
+        )
+
+        return
+
+    save_bookings(new_bookings)
+
+    admin_state.pop(message.from_user.id, None)
+
+    await message.answer(
+        "✅ Бронь удалена"
+    )
+
+# =====================================================
+# ОЧИСТКА БРОНЕЙ
+# =====================================================
+
+@dp.message(lambda m: m.text == "🧹 Очистить брони")
+async def clear_bookings(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    save_bookings([])
+
+    await message.answer(
+        "🧹 Все брони удалены"
+    )
+
+# =====================================================
+# ИЗМЕНЕНИЕ ЦЕНЫ
+# =====================================================
+
+@dp.message(lambda m: m.text == "💰 Изменить цену")
+async def change_price(message: types.Message):
+
+    if not is_admin(message.from_user.id):
+        return
+
+    admin_state[message.from_user.id] = "change_price"
+
+    await message.answer(
+        f"Текущая цена: {PRICE_PER_NIGHT}€\n\nВведите новую цену"
+    )
+
+@dp.message(lambda m: admin_state.get(m.from_user.id) == "change_price")
+async def process_price(message: types.Message):
+
+    global PRICE_PER_NIGHT
+
+    try:
+
+        PRICE_PER_NIGHT = int(message.text)
+
+        admin_state.pop(message.from_user.id, None)
+
+        await message.answer(
+            f"✅ Новая цена: {PRICE_PER_NIGHT}€"
+        )
+
+    except:
+
+        await message.answer(
+            "Введите число"
+        )
 @app.on_event("startup")
 async def startup_event():
 
