@@ -6,12 +6,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import FastAPI
-from fastapi.responses import (
-    FileResponse,
-    JSONResponse
-)
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-
 from pydantic import BaseModel
 
 from aiogram import Bot, Dispatcher
@@ -20,14 +16,17 @@ from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    CallbackQuery
+    CallbackQuery,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    WebAppInfo
 )
 
 # ==================================================
 # CONFIG
 # ==================================================
 
-BOT_TOKEN = os.getenv("8770383990:AAE3mqsQtIxbPE5YrntEz-Y4Jfc-93ezuGc")
+BOT_TOKEN = os.environ["8770383990:AAE3mqsQtIxbPE5YrntEz-Y4Jfc-93ezuGc"]
 
 ADMIN_IDS = [
     1008661058,
@@ -37,6 +36,8 @@ ADMIN_IDS = [
 PRICE_PER_NIGHT = 70
 
 DB_NAME = "bookings.db"
+
+SITE_URL = "https://apart-booking-production.up.railway.app"
 
 # ==================================================
 # FASTAPI
@@ -62,37 +63,20 @@ dp = Dispatcher()
 # DATABASE
 # ==================================================
 
-def get_connection():
-
-    conn = sqlite3.connect(
-        DB_NAME,
-        check_same_thread=False
-    )
-
-    conn.row_factory = sqlite3.Row
-
-    return conn
-
 def init_db():
 
-    conn = get_connection()
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS bookings (
-
         id TEXT PRIMARY KEY,
-
-        checkin TEXT NOT NULL,
-
-        checkout TEXT NOT NULL,
-
-        nights INTEGER NOT NULL,
-
-        total INTEGER NOT NULL,
-
-        created_at TEXT NOT NULL
+        checkin TEXT,
+        checkout TEXT,
+        nights INTEGER,
+        total INTEGER,
+        created_at TEXT
     )
     """)
 
@@ -112,13 +96,12 @@ def is_admin(user_id):
 
 def get_bookings():
 
-    conn = get_connection()
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT *
-    FROM bookings
+    SELECT * FROM bookings
     ORDER BY checkin ASC
     """)
 
@@ -131,115 +114,74 @@ def get_bookings():
     for row in rows:
 
         bookings.append({
-            "id": row["id"],
-            "checkin": row["checkin"],
-            "checkout": row["checkout"],
-            "nights": row["nights"],
-            "total": row["total"],
-            "created_at": row["created_at"]
+            "id": row[0],
+            "checkin": row[1],
+            "checkout": row[2],
+            "nights": row[3],
+            "total": row[4],
+            "created_at": row[5]
         })
 
     return bookings
 
 def has_conflict(checkin, checkout):
 
-    conn = get_connection()
+    bookings = get_bookings()
+
+    for booking in bookings:
+
+        start = datetime.strptime(
+            booking["checkin"],
+            "%Y-%m-%d"
+        ).date()
+
+        end = datetime.strptime(
+            booking["checkout"],
+            "%Y-%m-%d"
+        ).date()
+
+        if checkin < end and checkout > start:
+            return True
+
+    return False
+
+def create_booking(checkin, checkout):
+
+    nights = (checkout - checkin).days
+
+    total = nights * PRICE_PER_NIGHT
+
+    booking_id = str(uuid.uuid4())[:8]
+
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT COUNT(*)
-    FROM bookings
-    WHERE (
-        checkin < ?
-        AND checkout > ?
-    )
+    INSERT INTO bookings
+    VALUES (?, ?, ?, ?, ?, ?)
     """, (
+        booking_id,
+        str(checkin),
         str(checkout),
-        str(checkin)
+        nights,
+        total,
+        str(datetime.now())
     ))
 
-    count = cursor.fetchone()[0]
+    conn.commit()
 
     conn.close()
 
-    return count > 0
-
-def create_booking(checkin, checkout):
-
-    conn = get_connection()
-
-    cursor = conn.cursor()
-
-    try:
-
-        cursor.execute("BEGIN IMMEDIATE")
-
-        cursor.execute("""
-        SELECT COUNT(*)
-        FROM bookings
-        WHERE (
-            checkin < ?
-            AND checkout > ?
-        )
-        """, (
-            str(checkout),
-            str(checkin)
-        ))
-
-        count = cursor.fetchone()[0]
-
-        if count > 0:
-
-            conn.rollback()
-
-            return None
-
-        nights = (
-            checkout - checkin
-        ).days
-
-        total = nights * PRICE_PER_NIGHT
-
-        booking_id = str(
-            uuid.uuid4()
-        )[:8]
-
-        cursor.execute("""
-        INSERT INTO bookings
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            booking_id,
-            str(checkin),
-            str(checkout),
-            nights,
-            total,
-            str(datetime.now())
-        ))
-
-        conn.commit()
-
-        return {
-            "id": booking_id,
-            "nights": nights,
-            "total": total
-        }
-
-    except Exception as e:
-
-        conn.rollback()
-
-        print("BOOKING ERROR:", e)
-
-        return None
-
-    finally:
-
-        conn.close()
+    return {
+        "id": booking_id,
+        "nights": nights,
+        "total": total
+    }
 
 def delete_booking(booking_id):
 
-    conn = get_connection()
+    conn = sqlite3.connect(DB_NAME)
 
     cursor = conn.cursor()
 
@@ -304,43 +246,38 @@ async def busy_dates():
 @app.post("/book")
 async def book(data: BookingRequest):
 
-    try:
+    checkin = datetime.strptime(
+        data.checkin,
+        "%Y-%m-%d"
+    ).date()
 
-        checkin = datetime.strptime(
-            data.checkin,
-            "%Y-%m-%d"
-        ).date()
+    checkout = datetime.strptime(
+        data.checkout,
+        "%Y-%m-%d"
+    ).date()
 
-        checkout = datetime.strptime(
-            data.checkout,
-            "%Y-%m-%d"
-        ).date()
+    if checkin > checkout:
 
-    except:
+        checkin, checkout = checkout, checkin
 
-        return JSONResponse({
-            "success": False,
-            "message": "Ошибка даты"
-        })
-
-    if checkin >= checkout:
+    if checkin == checkout:
 
         return JSONResponse({
             "success": False,
             "message": "Минимум 1 ночь"
         })
 
+    if has_conflict(checkin, checkout):
+
+        return JSONResponse({
+            "success": False,
+            "message": "Даты заняты"
+        })
+
     booking = create_booking(
         checkin,
         checkout
     )
-
-    if not booking:
-
-        return JSONResponse({
-            "success": False,
-            "message": "Даты уже заняты"
-        })
 
     for admin_id in ADMIN_IDS:
 
@@ -349,22 +286,14 @@ async def book(data: BookingRequest):
             await bot.send_message(
                 admin_id,
                 f"🔥 НОВАЯ БРОНЬ\n\n"
-
                 f"ID: {booking['id']}\n"
-
                 f"📅 {checkin} → {checkout}\n"
-
                 f"🌙 {booking['nights']} ночей\n"
-
                 f"💰 {booking['total']}€"
             )
 
         except Exception as e:
-
-            print(
-                "TELEGRAM ERROR:",
-                e
-            )
+            print(e)
 
     return {
         "success": True,
@@ -419,18 +348,51 @@ def booking_keyboard(booking_id):
 @dp.message(Command("start"))
 async def start(message: Message):
 
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+
+            [
+                KeyboardButton(
+                    text="📅 Забронировать",
+                    web_app=WebAppInfo(
+                        url=SITE_URL
+                    )
+                )
+            ],
+
+            [
+                KeyboardButton(
+                    text="📞 Связаться"
+                )
+            ]
+        ],
+        resize_keyboard=True
+    )
+
+    await message.answer(
+        "🏠 ONE APART\nДобро пожаловать",
+        reply_markup=kb
+    )
+
+# ==================================================
+# ADMIN PANEL
+# ==================================================
+
+@dp.message(Command("admin"))
+async def admin(message: Message):
+
     if not is_admin(
         message.from_user.id
     ):
 
         await message.answer(
-            "У вас нет доступа"
+            "Нет доступа"
         )
 
         return
 
     await message.answer(
-        text="🏠 ONE APART ADMIN",
+        "🏠 ONE APART ADMIN",
         reply_markup=admin_keyboard()
     )
 
@@ -471,16 +433,11 @@ async def bookings_callback(
     for booking in bookings:
 
         await callback.message.answer(
-
             f"🏠 Бронь #{booking['id']}\n\n"
-
             f"📅 {booking['checkin']} → "
             f"{booking['checkout']}\n"
-
             f"🌙 {booking['nights']} ночей\n"
-
             f"💰 {booking['total']}€",
-
             reply_markup=booking_keyboard(
                 booking["id"]
             )
@@ -513,13 +470,9 @@ async def stats_callback(
     s = stats()
 
     await callback.message.answer(
-
         f"📊 СТАТИСТИКА\n\n"
-
         f"📅 Броней: {s['bookings']}\n"
-
         f"🌙 Ночей: {s['nights']}\n"
-
         f"💰 Доход: {s['revenue']}€"
     )
 
@@ -573,6 +526,17 @@ async def delete_callback(
     await callback.answer()
 
 # ==================================================
+# CONTACT
+# ==================================================
+
+@dp.message(lambda m: m.text == "📞 Связаться")
+async def contact(message: Message):
+
+    await message.answer(
+        "Напишите администратору"
+    )
+
+# ==================================================
 # STARTUP
 # ==================================================
 
@@ -581,26 +545,4 @@ async def startup():
 
     asyncio.create_task(
         dp.start_polling(bot)
-    )
-
-# ==================================================
-# MAIN
-# ==================================================
-
-if __name__ == "__main__":
-
-    import uvicorn
-
-    port = int(
-        os.environ.get(
-            "PORT",
-            8000
-        )
-    )
-
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False
     )
