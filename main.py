@@ -1,7 +1,8 @@
 import os
+import json
+import uuid
 import asyncio
 import sqlite3
-import uuid
 
 from datetime import datetime, date
 
@@ -10,25 +11,22 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart
 from aiogram.types import (
     Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery,
+    WebAppInfo,
     ReplyKeyboardMarkup,
     KeyboardButton,
-    WebAppInfo,
-    FSInputFile,
-    InputMediaPhoto
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
 )
 
 # ==================================================
 # CONFIG
 # ==================================================
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_IDS = [
     1008661058,
@@ -38,14 +36,6 @@ ADMIN_IDS = [
 PRICE_PER_NIGHT = 70
 
 DB_NAME = "bookings.db"
-
-SITE_URL = "https://apart-booking-production.up.railway.app"
-
-PHOTOS = [
-    "static/images/1.JPG",
-    "static/images/2.JPG",
-    "static/images/3.JPG"
-]
 
 # ==================================================
 # FASTAPI
@@ -89,7 +79,6 @@ def init_db():
     """)
 
     conn.commit()
-
     conn.close()
 
 init_db()
@@ -206,26 +195,6 @@ def delete_booking(booking_id):
 
     return deleted > 0
 
-def stats():
-
-    bookings = get_bookings()
-
-    revenue = sum(
-        booking["total"]
-        for booking in bookings
-    )
-
-    nights = sum(
-        booking["nights"]
-        for booking in bookings
-    )
-
-    return {
-        "bookings": len(bookings),
-        "revenue": revenue,
-        "nights": nights
-    }
-
 # ==================================================
 # MODELS
 # ==================================================
@@ -236,7 +205,7 @@ class BookingRequest(BaseModel):
     checkout: str
 
 # ==================================================
-# WEB ROUTES
+# WEB
 # ==================================================
 
 @app.get("/")
@@ -266,29 +235,18 @@ async def book(data: BookingRequest):
         "%Y-%m-%d"
     ).date()
 
-    if checkin > checkout:
+    if checkin >= checkout:
 
-        checkin, checkout = checkout, checkin
+        return JSONResponse({
+            "success": False,
+            "message": "Минимум 1 ночь"
+        })
 
     if checkin < today:
 
         return JSONResponse({
             "success": False,
             "message": "Нельзя бронировать прошедшие даты"
-        })
-
-    if checkout <= today:
-
-        return JSONResponse({
-            "success": False,
-            "message": "Некорректная дата выезда"
-        })
-
-    if checkin == checkout:
-
-        return JSONResponse({
-            "success": False,
-            "message": "Минимум 1 ночь"
         })
 
     if has_conflict(checkin, checkout):
@@ -316,8 +274,8 @@ async def book(data: BookingRequest):
                 f"💰 {booking['total']}€"
             )
 
-        except Exception as e:
-            print(e)
+        except:
+            pass
 
     return {
         "success": True,
@@ -351,54 +309,11 @@ def admin_keyboard():
         ]
     )
 
-def booking_keyboard(booking_id):
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-
-            [
-                InlineKeyboardButton(
-                    text="❌ Удалить",
-                    callback_data=f"delete_{booking_id}"
-                )
-            ]
-        ]
-    )
-
 # ==================================================
-# PHOTOS
+# TELEGRAM START
 # ==================================================
 
-async def send_photos(message):
-
-    media = []
-
-    for i, photo in enumerate(PHOTOS):
-
-        if i == 0:
-
-            media.append(
-                InputMediaPhoto(
-                    media=FSInputFile(photo),
-                    caption="🏠 ONE APART"
-                )
-            )
-
-        else:
-
-            media.append(
-                InputMediaPhoto(
-                    media=FSInputFile(photo)
-                )
-            )
-
-    await message.answer_media_group(media)
-
-# ==================================================
-# START
-# ==================================================
-
-@dp.message(Command("start"))
+@dp.message(CommandStart())
 async def start(message: Message):
 
     kb = ReplyKeyboardMarkup(
@@ -408,14 +323,8 @@ async def start(message: Message):
                 KeyboardButton(
                     text="📅 Забронировать",
                     web_app=WebAppInfo(
-                        url=SITE_URL
+                        url="https://apart-booking-production.up.railway.app"
                     )
-                )
-            ],
-
-            [
-                KeyboardButton(
-                    text="📸 Фото квартиры"
                 )
             ],
 
@@ -430,106 +339,35 @@ async def start(message: Message):
                     text="📞 Связаться"
                 )
             ]
+
         ],
         resize_keyboard=True
     )
 
     await message.answer(
-        "🏠 ONE APART\nДобро пожаловать",
+        "Добро пожаловать 👋",
         reply_markup=kb
     )
 
-# ==================================================
-# ADMIN
-# ==================================================
-
-@dp.message(Command("admin"))
-async def admin(message: Message):
-
-    if not is_admin(message.from_user.id):
+    if is_admin(message.from_user.id):
 
         await message.answer(
-            "Нет доступа"
+            "🏠 ONE APART ADMIN",
+            reply_markup=admin_keyboard()
         )
-
-        return
-
-    await message.answer(
-        "🏠 ONE APART ADMIN",
-        reply_markup=admin_keyboard()
-    )
-
-# ==================================================
-# PHOTOS BUTTON
-# ==================================================
-
-@dp.message(F.text == "📸 Фото квартиры")
-async def photos(message: Message):
-
-    await send_photos(message)
 
 # ==================================================
 # DESCRIPTION
 # ==================================================
 
-@dp.message(F.text == "📋 Описание квартиры")
+@dp.message(lambda m: m.text == "📋 Описание квартиры")
 async def description(message: Message):
 
-    text = """
-С НАМИ КОМФОРТНО❣️
-Добро пожаловать 🤗  в квартиру комфорт класса❗️
-Абсолютная чистота - контроль качества уборки квартиры.🪷
-Светлая, просторная, квартира с новым качественным ремонтом, рядом с центром Новосибирска на площади Калинина.
-Высокий этаж, панорамное остекление, шикарный вид из окна.
-Если вы гость в Новосибирске, находитесь в командировке или хотите отвлечься от рутины, сменить обстановку, наша студия - идеальный выбор!
-
-В квартире может проживать не более 2 гостей❗️
-Условия для размещения с детьми не предусмотрены❗️
-
-ДЛЯ ВАС:
-🔆в комнате: двухспальная кровать шириной 160 см с ортопедическим матрасом, подушки 4 шт., высококачественное постельное белье 100% хлопок, любителям поспать для комфортного сна шторы блэкаут, разные варианты освещения, кондиционер-инвертор, смарт-телевизор, туалетный столик, вместительный комод, прикроватные тумбы, комфортный диван (не раскладной), Wi-Fi 🛜
-
-🔆в ванной комната: свежие махровые полотенца, ванные принадлежности: гель для душа, шампунь, кондиционер для волос, жидкое мыло для рук, крем для рук, предметы гигиены, одноразовая паста и зубная щётка, душевая колонна, ванна, водонагреватель, фен
-
-🔆на кухне: шикарный кухонный гарнитур с барной стойкой, барные стулья, микроволновая печь, духовка, индукционная варочная плита, холодильник, чайник, посуда, рабочее место
-
-🔆в прихожей: большой шкаф, стиральная машина с сушкой, утюг, гладильная доска, сушилка, зонтик ☂️
-
-🎁 Гостям предоставлены: кофе ☕️, черный чай, сахар
-
-Удобное месторасположение дома‼️
-
-В ШАГОВОЙ ДОСТУПНОСТИ:
-▪️Ⓜ️ Заельцовская
-▪️Ⓜ️ Гагаринская
-▪️Зоопарк
-▪️Дендропарк
-▪️ТЦ Роял Парк
-▪️рестораны
-▪️аптеки
-▪️банки
-▪️фитнес клубы
-
-БЕЗ ПЕРЕСАДОК ДОЕДИТЕ ДО:
-📍 Центр города
-📍 Аквапарк Аквамир
-📍 НОВАТ
-📍 Термы Мира
-📍 Сибирь-Арена
-📍 Михайловская набережная
-
-Внимание ⚠️
-Цена зависит от дней проживания, будни/выходные/праздничные дни.
-
-Заезд в 15:00
-Выезд в 12:00
-
-ДЕПОЗИТ 6000 руб.
-
-⛔️ ЗАПРЕЩЕНО:
-КУРИТЬ
-ПРОВОДИТЬ ВЕЧЕРИНКИ
-"""
+    text = open(
+        "description.txt",
+        "r",
+        encoding="utf-8"
+    ).read()
 
     await message.answer(text)
 
@@ -537,23 +375,19 @@ async def description(message: Message):
 # CONTACT
 # ==================================================
 
-@dp.message(F.text == "📞 Связаться")
+@dp.message(lambda m: m.text == "📞 Связаться")
 async def contact(message: Message):
 
     await message.answer(
-        "Напишите администратору."
+        "Для бронирования и вопросов:\n@your_username"
     )
 
 # ==================================================
-# BOOKINGS
+# ADMIN BOOKINGS
 # ==================================================
 
-@dp.callback_query(
-    lambda c: c.data == "bookings"
-)
-async def bookings_callback(
-    callback: CallbackQuery
-):
+@dp.callback_query(lambda c: c.data == "bookings")
+async def bookings_callback(callback):
 
     if not is_admin(callback.from_user.id):
 
@@ -572,35 +406,25 @@ async def bookings_callback(
             "Броней пока нет"
         )
 
-        await callback.answer()
-
         return
 
     for booking in bookings:
 
         await callback.message.answer(
+
             f"🏠 Бронь #{booking['id']}\n\n"
             f"📅 {booking['checkin']} → "
             f"{booking['checkout']}\n"
             f"🌙 {booking['nights']} ночей\n"
-            f"💰 {booking['total']}€",
-            reply_markup=booking_keyboard(
-                booking["id"]
-            )
+            f"💰 {booking['total']}€"
         )
 
-    await callback.answer()
-
 # ==================================================
-# STATS
+# ADMIN STATS
 # ==================================================
 
-@dp.callback_query(
-    lambda c: c.data == "stats"
-)
-async def stats_callback(
-    callback: CallbackQuery
-):
+@dp.callback_query(lambda c: c.data == "stats")
+async def stats_callback(callback):
 
     if not is_admin(callback.from_user.id):
 
@@ -611,61 +435,25 @@ async def stats_callback(
 
         return
 
-    s = stats()
+    bookings = get_bookings()
+
+    revenue = sum(
+        booking["total"]
+        for booking in bookings
+    )
+
+    nights = sum(
+        booking["nights"]
+        for booking in bookings
+    )
 
     await callback.message.answer(
+
         f"📊 СТАТИСТИКА\n\n"
-        f"📅 Броней: {s['bookings']}\n"
-        f"🌙 Ночей: {s['nights']}\n"
-        f"💰 Доход: {s['revenue']}€"
+        f"📅 Броней: {len(bookings)}\n"
+        f"🌙 Ночей: {nights}\n"
+        f"💰 Доход: {revenue}€"
     )
-
-    await callback.answer()
-
-# ==================================================
-# DELETE BOOKING
-# ==================================================
-
-@dp.callback_query(
-    lambda c: c.data.startswith(
-        "delete_"
-    )
-)
-async def delete_callback(
-    callback: CallbackQuery
-):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Нет доступа",
-            show_alert=True
-        )
-
-        return
-
-    booking_id = callback.data.replace(
-        "delete_",
-        ""
-    )
-
-    success = delete_booking(
-        booking_id
-    )
-
-    if success:
-
-        await callback.message.edit_text(
-            f"❌ Бронь {booking_id} удалена"
-        )
-
-    else:
-
-        await callback.message.answer(
-            "Ошибка удаления"
-        )
-
-    await callback.answer()
 
 # ==================================================
 # STARTUP
