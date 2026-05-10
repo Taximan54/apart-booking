@@ -2,9 +2,9 @@ import os
 import json
 import uuid
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -16,7 +16,10 @@ from aiogram.types import (
     KeyboardButton,
     WebAppInfo,
     FSInputFile,
-    InputMediaPhoto
+    InputMediaPhoto,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery
 )
 
 # =====================================================
@@ -33,11 +36,19 @@ PRICE_PER_NIGHT = 70
 
 BOOKINGS_FILE = "bookings.json"
 
+BOOKING_STATUSES = {
+    "pending": "⏳ Ожидание",
+    "confirmed": "✅ Подтверждено",
+    "cancelled": "❌ Отменено"
+}
+
 PHOTOS = [
     "static/images/1.JPG",
     "static/images/2.JPG",
     "static/images/3.JPG"
 ]
+
+WEBAPP_URL = "https://apart-booking-production.up.railway.app"
 
 # =====================================================
 # FASTAPI
@@ -52,7 +63,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # =====================================================
 
 bot = Bot(token=BOT_TOKEN)
-print(repr(BOT_TOKEN))
+
 dp = Dispatcher()
 
 # =====================================================
@@ -64,28 +75,40 @@ class Booking(BaseModel):
     checkout: str
 
 # =====================================================
-# РАБОТА С ФАЙЛОМ
+# ФАЙЛ БРОНЕЙ
 # =====================================================
 
 def load_bookings():
+
     try:
+
         with open(BOOKINGS_FILE, "r", encoding="utf-8") as f:
+
             return json.load(f)
+
     except:
+
         return []
 
 def save_bookings(data):
+
     with open(BOOKINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
 
 # =====================================================
-# ГЛАВНАЯ СТРАНИЦА
+# HTML
 # =====================================================
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
 
-    html = """
+    html = f"""
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -97,204 +120,187 @@ async def home():
 
 <style>
 
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f3f3f3;
-    color:#111;
-}
+body{{
+margin:0;
+background:#f3f3f3;
+font-family:Arial;
+color:#111;
+}}
 
-.header{
-    background:white;
-    padding:24px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);
-}
+.header{{
+background:white;
+padding:24px;
+box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}}
 
-.logo{
-    font-size:34px;
-    font-weight:bold;
-}
+.logo{{
+font-size:34px;
+font-weight:bold;
+}}
 
-.sub{
-    margin-top:6px;
-    color:#777;
-    font-size:15px;
-}
+.sub{{
+margin-top:5px;
+color:#666;
+}}
 
-.container{
-    max-width:560px;
-    margin:auto;
-    padding:20px;
-}
+.container{{
+max-width:600px;
+margin:auto;
+padding:20px;
+}}
 
-.gallery{
-    display:flex;
-    gap:14px;
-    overflow-x:auto;
-    margin-bottom:20px;
-    scroll-snap-type:x mandatory;
-}
+.gallery{{
+display:flex;
+gap:14px;
+overflow-x:auto;
+margin-bottom:20px;
+}}
 
-.gallery img{
-    width:100%;
-    max-width:500px;
-    height:300px;
-    object-fit:cover;
-    border-radius:24px;
-    flex-shrink:0;
-    scroll-snap-align:start;
-}
+.gallery img{{
+width:100%;
+max-width:520px;
+height:320px;
+object-fit:cover;
+border-radius:24px;
+flex-shrink:0;
+}}
 
-.card{
-    background:white;
-    border-radius:28px;
-    padding:24px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.06);
-}
+.card{{
+background:white;
+padding:24px;
+border-radius:30px;
+box-shadow:0 4px 20px rgba(0,0,0,0.05);
+}}
 
-.calendar-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
-}
+.calendar-header{{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
+}}
 
-.month{
-    font-size:30px;
-    font-weight:bold;
-}
+.month{{
+font-size:30px;
+font-weight:bold;
+}}
 
-.nav{
-    width:52px;
-    height:52px;
-    border-radius:50%;
-    border:none;
-    background:#f0f0f0;
-    font-size:24px;
-    cursor:pointer;
-}
+.nav{{
+width:50px;
+height:50px;
+border:none;
+border-radius:50%;
+background:#f0f0f0;
+font-size:24px;
+cursor:pointer;
+}}
 
-.weekdays{
-    display:grid;
-    grid-template-columns:repeat(7,1fr);
-    gap:10px;
-    margin-bottom:14px;
-    text-align:center;
-    color:#777;
-    font-size:14px;
-}
+.weekdays{{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:10px;
+margin-bottom:10px;
+text-align:center;
+color:#777;
+}}
 
-.calendar{
-    display:grid;
-    grid-template-columns:repeat(7,1fr);
-    gap:10px;
-}
+.calendar{{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:10px;
+}}
 
-.day{
-    aspect-ratio:1;
-    border-radius:18px;
-    background:white;
-    border:2px solid #eee;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:bold;
-    cursor:pointer;
-    transition:0.2s;
-    font-size:18px;
-}
+.day{{
+aspect-ratio:1;
+border-radius:18px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
+cursor:pointer;
+border:2px solid #eee;
+background:white;
+transition:0.2s;
+}}
 
-.day:hover{
-    transform:scale(1.05);
-}
+.day:hover{{
+transform:scale(1.05);
+}}
 
-.busy{
-    background:#ff6b6b;
-    color:white;
-    border:none;
-    cursor:not-allowed;
-}
+.busy{{
+background:#ff6b6b;
+color:white;
+border:none;
+cursor:not-allowed;
+}}
 
-.selected{
-    background:black;
-    color:white;
-    border:none;
-}
+.selected{{
+background:black;
+color:white;
+border:none;
+}}
 
-.range{
-    background:#d9d9d9;
-}
+.range{{
+background:#ddd;
+}}
 
-.past{
-    opacity:0.4;
-    cursor:not-allowed;
-}
+.past{{
+opacity:0.35;
+cursor:not-allowed;
+}}
 
-.info{
-    margin-top:26px;
-    text-align:center;
-    line-height:1.7;
-    font-size:18px;
-}
+.info{{
+margin-top:25px;
+text-align:center;
+line-height:1.7;
+font-size:18px;
+}}
 
-.price{
-    font-size:42px;
-    font-weight:bold;
-    margin-top:16px;
-}
+.price{{
+font-size:42px;
+font-weight:bold;
+margin-top:16px;
+}}
 
-.btn{
-    width:100%;
-    margin-top:30px;
-    border:none;
-    border-radius:22px;
-    padding:22px;
-    background:black;
-    color:white;
-    font-size:22px;
-    font-weight:bold;
-    cursor:pointer;
-}
+.btn{{
+width:100%;
+margin-top:30px;
+padding:22px;
+border:none;
+border-radius:24px;
+background:black;
+color:white;
+font-size:22px;
+font-weight:bold;
+cursor:pointer;
+}}
 
-.success{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.7);
-    display:none;
-    justify-content:center;
-    align-items:center;
-    z-index:999;
-}
+.success{{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.7);
+display:none;
+justify-content:center;
+align-items:center;
+}}
 
-.success-box{
-    background:white;
-    width:90%;
-    max-width:420px;
-    border-radius:28px;
-    padding:34px;
-    text-align:center;
-}
+.success-box{{
+background:white;
+padding:34px;
+border-radius:28px;
+width:90%;
+max-width:420px;
+text-align:center;
+}}
 
-.success-title{
-    font-size:32px;
-    font-weight:bold;
-    margin-bottom:20px;
-}
-
-.success-text{
-    font-size:20px;
-    line-height:1.7;
-}
-
-.close{
-    margin-top:24px;
-    border:none;
-    background:black;
-    color:white;
-    padding:16px 30px;
-    border-radius:16px;
-    font-size:18px;
-}
+.close{{
+margin-top:20px;
+padding:16px 30px;
+border:none;
+border-radius:18px;
+background:black;
+color:white;
+font-size:18px;
+}}
 
 </style>
 
@@ -364,11 +370,9 @@ ONE APART
 
 <div class="success-box">
 
-<div class="success-title">
-Бронь подтверждена
-</div>
+<h2>Бронь создана</h2>
 
-<div class="success-text" id="successText"></div>
+<div id="successText"></div>
 
 <button class="close" onclick="closeSuccess()">
 Закрыть
@@ -385,13 +389,13 @@ let busyDates = []
 let checkin = null
 let checkout = null
 
+const PRICE = {PRICE_PER_NIGHT}
+
 const today = new Date()
 today.setHours(0,0,0,0)
 
 let currentMonth = today.getMonth()
 let currentYear = today.getFullYear()
-
-const PRICE = 70
 
 const monthNames = [
 "Январь",
@@ -408,261 +412,265 @@ const monthNames = [
 "Декабрь"
 ]
 
-async function loadBusyDates(){
+async function loadBusyDates(){{
 
-    const response = await fetch("/busy-dates")
+const response = await fetch("/busy-dates")
 
-    busyDates = await response.json()
+busyDates = await response.json()
 
-    renderCalendar()
-}
+renderCalendar()
 
-function isBusy(date){
+}}
 
-    for(let b of busyDates){
+function isBusy(date){{
 
-        if(date < b.checkout && date >= b.checkin){
-            return true
-        }
-    }
+for(let b of busyDates){{
 
-    return false
-}
+if(
+date < b.checkout &&
+date >= b.checkin &&
+b.status !== "cancelled"
+){{
+return true
+}}
 
-function renderCalendar(){
+}}
 
-    const calendar = document.getElementById("calendar")
+return false
 
-    calendar.innerHTML = ""
+}}
 
-    document.getElementById("monthName").innerText =
-    `${monthNames[currentMonth]} ${currentYear}`
+function renderCalendar(){{
 
-    const daysInMonth =
-    new Date(currentYear,currentMonth+1,0).getDate()
+const calendar = document.getElementById("calendar")
 
-    for(let day=1; day<=daysInMonth; day++){
+calendar.innerHTML = ""
 
-        const date =
-        `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+document.getElementById("monthName").innerText =
+`${{monthNames[currentMonth]}} ${{currentYear}}`
 
-        const div = document.createElement("div")
+const daysInMonth =
+new Date(currentYear,currentMonth+1,0).getDate()
 
-        div.className = "day"
+for(let day=1; day<=daysInMonth; day++){{
 
-        div.innerText = day
+const date =
+`${{currentYear}}-${{String(currentMonth+1).padStart(2,'0')}}-${{String(day).padStart(2,'0')}}`
 
-        const dateObj = new Date(date)
+const div = document.createElement("div")
 
-        if(dateObj < today){
+div.className = "day"
 
-            div.classList.add("past")
+div.innerText = day
 
-        }else if(isBusy(date)){
+const dateObj = new Date(date)
 
-            div.classList.add("busy")
+if(dateObj < today){{
 
-        }else{
+div.classList.add("past")
 
-            div.onclick = ()=>selectDate(date)
-        }
+}}
 
-        if(checkin && date===checkin){
-            div.classList.add("selected")
-        }
+else if(isBusy(date)){{
 
-        if(checkout && date===checkout){
-            div.classList.add("selected")
-        }
+div.classList.add("busy")
 
-        if(checkin && checkout){
+}}
 
-            if(date > checkin && date < checkout){
-                div.classList.add("range")
-            }
-        }
+else{{
 
-        calendar.appendChild(div)
-    }
+div.onclick = ()=>selectDate(date)
 
-    updateInfo()
-}
+}}
 
-function selectDate(date){
+if(checkin && date===checkin){{
+div.classList.add("selected")
+}}
 
-    if(isBusy(date)){
-        return
-    }
+if(checkout && date===checkout){{
+div.classList.add("selected")
+}}
 
-    const selectedDate = new Date(date)
+if(checkin && checkout){{
+if(date > checkin && date < checkout){{
+div.classList.add("range")
+}}
+}}
 
-    if(selectedDate < today){
-        return
-    }
+calendar.appendChild(div)
 
-    if(!checkin){
+}}
 
-        checkin = date
-        checkout = null
+updateInfo()
 
-        renderCalendar()
+}}
 
-        return
-    }
+function selectDate(date){{
 
-    if(!checkout){
+const selectedDate = new Date(date)
 
-        if(date <= checkin){
+if(selectedDate < today){{
+return
+}}
 
-            checkin = date
-            renderCalendar()
+if(!checkin){{
 
-            return
-        }
+checkin = date
+checkout = null
 
-        let current = new Date(checkin)
+renderCalendar()
 
-        while(current < new Date(date)){
+return
 
-            const currentDate =
-            current.toISOString().split("T")[0]
+}}
 
-            if(isBusy(currentDate)){
+if(!checkout){{
 
-                alert("Диапазон содержит занятые даты")
+if(date <= checkin){{
 
-                return
-            }
+checkin = date
 
-            current.setDate(current.getDate()+1)
-        }
+renderCalendar()
 
-        checkout = date
+return
 
-        renderCalendar()
+}}
 
-        return
-    }
+checkout = date
 
-    checkin = date
-    checkout = null
+renderCalendar()
 
-    renderCalendar()
-}
+return
 
-function updateInfo(){
+}}
 
-    const info = document.getElementById("info")
+checkin = date
+checkout = null
 
-    if(checkin && !checkout){
+renderCalendar()
 
-        info.innerHTML =
-        `Заезд:<br><b>${checkin}</b>`
+}}
 
-        return
-    }
+function updateInfo(){{
 
-    if(checkin && checkout){
+const info = document.getElementById("info")
 
-        const start = new Date(checkin)
+if(checkin && !checkout){{
 
-        const end = new Date(checkout)
+info.innerHTML =
+`Заезд:<br><b>${{checkin}}</b>`
 
-        const nights =
-        (end-start)/(1000*60*60*24)
+return
 
-        const total =
-        nights * PRICE
+}}
 
-        info.innerHTML =
-        `
-        Заезд: <b>${checkin}</b><br>
-        Выезд: <b>${checkout}</b><br>
-        Ночей: <b>${nights}</b>
+if(checkin && checkout){{
 
-        <div class="price">
-        ${total}€
-        </div>
-        `
-    }
-}
+const start = new Date(checkin)
+const end = new Date(checkout)
 
-function prevMonth(){
+const nights =
+(end-start)/(1000*60*60*24)
 
-    currentMonth--
+const total =
+nights * PRICE
 
-    if(currentMonth < 0){
+info.innerHTML =
+`
+Заезд: <b>${{checkin}}</b><br>
+Выезд: <b>${{checkout}}</b><br>
+Ночей: <b>${{nights}}</b>
 
-        currentMonth = 11
-        currentYear--
-    }
+<div class="price">
+${{total}}€
+</div>
+`
 
-    renderCalendar()
-}
+}}
 
-function nextMonth(){
+}}
 
-    currentMonth++
+function prevMonth(){{
 
-    if(currentMonth > 11){
+currentMonth--
 
-        currentMonth = 0
-        currentYear++
-    }
+if(currentMonth < 0){{
+currentMonth = 11
+currentYear--
+}}
 
-    renderCalendar()
-}
+renderCalendar()
 
-async function bookDate(){
+}}
 
-    if(!checkin || !checkout){
+function nextMonth(){{
 
-        alert("Выберите даты")
+currentMonth++
 
-        return
-    }
+if(currentMonth > 11){{
+currentMonth = 0
+currentYear++
+}}
 
-    const response = await fetch("/book",{
+renderCalendar()
 
-        method:"POST",
+}}
 
-        headers:{
-            "Content-Type":"application/json"
-        },
+async function bookDate(){{
 
-        body:JSON.stringify({
-            checkin,
-            checkout
-        })
-    })
+if(!checkin || !checkout){{
+alert("Выберите даты")
+return
+}}
 
-    const data = await response.json()
+const response = await fetch("/book",{{
 
-    if(data.success){
+method:"POST",
 
-        document.getElementById("success").style.display =
-        "flex"
+headers:{{
+"Content-Type":"application/json"
+}},
 
-        document.getElementById("successText").innerHTML =
-        `
-        ID брони: <b>${data.booking_id}</b><br><br>
-        ${checkin} → ${checkout}<br>
-        ${data.nights} ночей<br><br>
-        <b>${data.total}€</b>
-        `
+body:JSON.stringify({{
+checkin,
+checkout
+}})
 
-        loadBusyDates()
+}})
 
-    }else{
+const data = await response.json()
 
-        alert(data.message)
-    }
-}
+if(data.success){{
 
-function closeSuccess(){
+document.getElementById("success").style.display =
+"flex"
 
-    location.reload()
-}
+document.getElementById("successText").innerHTML =
+`
+ID: <b>${{data.booking_id}}</b><br><br>
+
+${{checkin}} → ${{checkout}}<br>
+
+${{data.nights}} ночей<br><br>
+
+<b>${{data.total}}€</b>
+`
+
+loadBusyDates()
+
+}}
+
+else{{
+
+alert(data.message)
+
+}}
+
+}}
+
+function closeSuccess(){{
+location.reload()
+}}
 
 loadBusyDates()
 
@@ -675,18 +683,16 @@ loadBusyDates()
     return HTMLResponse(html)
 
 # =====================================================
-# ЗАНЯТЫЕ ДАТЫ
+# BUSY DATES
 # =====================================================
 
 @app.get("/busy-dates")
 async def busy_dates():
 
-    bookings = load_bookings()
-
-    return JSONResponse(bookings)
+    return JSONResponse(load_bookings())
 
 # =====================================================
-# БРОНИРОВАНИЕ
+# BOOKING
 # =====================================================
 
 @app.post("/book")
@@ -696,22 +702,34 @@ async def book(data: Booking):
 
     today = datetime.now().date()
 
-    checkin = datetime.strptime(data.checkin, "%Y-%m-%d").date()
-    checkout = datetime.strptime(data.checkout, "%Y-%m-%d").date()
+    checkin = datetime.strptime(
+        data.checkin,
+        "%Y-%m-%d"
+    ).date()
+
+    checkout = datetime.strptime(
+        data.checkout,
+        "%Y-%m-%d"
+    ).date()
 
     if checkin < today:
+
         return {
             "success": False,
-            "message": "Нельзя бронировать прошедшие даты"
+            "message": "Нельзя бронировать прошлые даты"
         }
 
     if checkout <= checkin:
+
         return {
             "success": False,
             "message": "Некорректные даты"
         }
 
     for b in bookings:
+
+        if b["status"] == "cancelled":
+            continue
 
         booked_checkin = datetime.strptime(
             b["checkin"],
@@ -723,11 +741,14 @@ async def book(data: Booking):
             "%Y-%m-%d"
         ).date()
 
-        if checkin < booked_checkout and checkout > booked_checkin:
+        if (
+            checkin < booked_checkout and
+            checkout > booked_checkin
+        ):
 
             return {
                 "success": False,
-                "message": "Даты уже заняты"
+                "message": "Даты заняты"
             }
 
     nights = (checkout - checkin).days
@@ -741,12 +762,28 @@ async def book(data: Booking):
         "checkin": str(checkin),
         "checkout": str(checkout),
         "nights": nights,
-        "total": total
+        "total": total,
+        "status": "pending"
     }
 
     bookings.append(booking)
 
     save_bookings(bookings)
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Подтвердить",
+                    callback_data=f"confirm_{booking_id}"
+                ),
+                InlineKeyboardButton(
+                    text="❌ Отменить",
+                    callback_data=f"cancel_{booking_id}"
+                )
+            ]
+        ]
+    )
 
     for admin in ADMIN_IDS:
 
@@ -763,7 +800,11 @@ ID: {booking_id}
 Ночей: {nights}
 
 Сумма: {total}€
-"""
+
+Статус:
+⏳ Ожидание
+""",
+            reply_markup=keyboard
         )
 
     return {
@@ -774,7 +815,7 @@ ID: {booking_id}
     }
 
 # =====================================================
-# ФОТО
+# TELEGRAM PHOTO
 # =====================================================
 
 async def send_photos(message):
@@ -803,7 +844,7 @@ async def send_photos(message):
     await message.answer_media_group(media)
 
 # =====================================================
-# TELEGRAM START
+# START
 # =====================================================
 
 @dp.message(CommandStart())
@@ -817,7 +858,7 @@ async def start(message: types.Message):
                 KeyboardButton(
                     text="📅 Забронировать",
                     web_app=WebAppInfo(
-                        url="https://apart-booking-production.up.railway.app"
+                        url=WEBAPP_URL
                     )
                 )
             ],
@@ -832,6 +873,12 @@ async def start(message: types.Message):
                 KeyboardButton(
                     text="📋 Описание квартиры"
                 )
+            ],
+
+            [
+                KeyboardButton(
+                    text="🛠 Админка"
+                )
             ]
 
         ],
@@ -840,16 +887,14 @@ async def start(message: types.Message):
     )
 
     await message.answer(
-
         "Добро пожаловать в ONE APART ✨",
-
         reply_markup=keyboard
     )
 
     await send_photos(message)
 
 # =====================================================
-# ФОТО КВАРТИРЫ
+# PHOTO
 # =====================================================
 
 @dp.message(lambda m: m.text == "📸 Фото квартиры")
@@ -858,37 +903,191 @@ async def photos(message: types.Message):
     await send_photos(message)
 
 # =====================================================
-# ОПИСАНИЕ КВАРТИРЫ
+# DESCRIPTION
 # =====================================================
 
 @dp.message(lambda m: m.text == "📋 Описание квартиры")
 async def apartment_description(message: types.Message):
 
     text = """С НАМИ КОМФОРТНО❣️
-
-Добро пожаловать 🤗 в квартиру комфорт класса❗️
-
+Добро пожаловать 🤗  в квартиру комфорт класса❗️
 Абсолютная чистота - контроль качества уборки квартиры.🪷
-
-Светлая, просторная квартира с новым качественным ремонтом рядом с центром Новосибирска на площади Калинина.
-
+Светлая, просторная, квартира с новым качественным ремонтом,  рядом с центром Новосибирска на площади Калинина.
 Высокий этаж, панорамное остекление, шикарный вид из окна.
-
-Если вы гость в Новосибирске, находитесь в командировке или хотите отвлечься от рутины — наша студия идеальный выбор.
+Если вы гость в Новосибирске, находитесь в командировке или хотите отвлечься от рутины, сменить обстановку, наша студия - идеальный выбор!
 
 В квартире может проживать не более 2 гостей❗️
+Условия для размещения с детьми не предусмотрены❗️
 
-Условия для размещения с детьми не предусмотрены❗️"""
+ДЛЯ ВАС:
+🔆в комнате: двухспальная кровать шириной 160 см с ортопедическим матрасом, подушки 4 шт., высококачественное постельное белье 100% хлопок, любителям поспать для комфортного сна шторы блэкаут, разные варианты освещения, кондиционер-инвертор, смарт-телевизор, туалетный столик, вместительный комод, прикроватные тумбы, комфортный диван (не раскладной), Wi-Fi 🛜 
+🔆в ванной комната: свежие махровые полотенца, ванные принадлежности: гель для душа, шампунь, кондиционер для волос, жидкое мыло для рук, крем для рук, предметы гигиены, одноразовая паста и зубная щётка, душевая колонна, ванна, водонагреватель, фен
+🔆на кухне: шикарный кухонный гарнитур с барной стойкой, барные стулья, микроволновая печь, духовка, индукционная варочная плита на 2 конфорки, 2-х камерный холодильник, чайник, столовые прибора, посуда сервировочная и для приготовления пищи, комфортное рабочее место за барной стойкой 
+🔆в прихожей: большой вместительный шкаф, стиральная машина с функцией сушки, утюг, гладильная доска, раскладная сушилка для белья, пуфик, обувная  ложка, зонтик ☂️ 
+
+🎁 Гостям предоставлены в зоне кухни: кофе☕️ черный чай, сахар
+
+Удобное месторасположение дома‼️В ШАГОВОЙ ДОСТУПНОСТИ находятся:
+станции метро 
+▪️ Ⓜ️ Заельцовская 
+▪️ Ⓜ️ Гагаринская
+▪️Зоопарк 16 мин.пешком 
+▪️Дендропарк Ботанический парк
+▪️Парфюмерный магазин "Золотое Яблоко"
+▪️остановки общественного транспорта 
+▪️торговый центр "Роял Парк" с кинотеатром
+▪️рестораны
+▪️Лофт-парк "Подземка"
+▪️аптеки, в том числе круглосуточные
+▪️сетевые продуктовые, ювелирные и другие магазины
+▪️продуктовый рынок "Заельцовский"
+▪️банки и круглосуточные банкоматы
+▪️салоны красоты и фитнес клубы
+
+БЕЗ ПЕРЕСАДОК ДОЕДИТЕ ДО :
+📍Центр города
+📍Площадь и улица Ленина 
+📍Зоопарк, Дельфинарий 
+📍Цирк
+📍"Гастрокорт" - гастрономическое пространство 
+📍Аквапарк "Аквамир"
+📍 Государственная Научно-Техническая Библиотека
+📍 Михайловская набережная, расположенная вдоль побережья Оби
+📍 Речной вокзал на Михайловской набережной для речных прогулок на теплоходе (сезонное)
+📍 Колесо обозрения на Михайловской набережной 
+📍 Собор Александра Невского
+📍 Часовня Николая Чудотворца 
+📍 Театр Оперы и Балета - НОВАТ
+📍  Театр " Глобус "
+📍 Драматический театр Сергея 
+Афанасьева
+📍Кукольный театр 🎭 
+📍Краеведческий музей
+📍Кинотеатр «Победа»
+📍 Ледовая арена "Сибирь-Арена"
+📍Термальный центр для восстановления и релакса "Термы Мира "
+📍Горбольница
+📍НИИТО
+📍Центральный Парк: аттракционы, карусели 
+📍Первомайский парк  
+📍Заельцовсий Парк 
+
+Добавьте наше объявление в избранное нажав на ❤️
+Внимание ⚠️ ЦЕНА зависит от дней проживания, будни/выходные/праздничные дни.
+Заезд в 15.00, выезд в 12.00 или в удобное для Вас время - по договоренности.
+Ранний заезд/ поздний выезд только по предварительному согласованию при наличии возможности.
+
+ДЕПОЗИТ 6000 руб. возвращается после выезда и уборки при соблюдении правил проживания.
+Для заселения необходимо предъявить свои паспортные данные и внести полную оплату за проживание + депозит.
+▪️Предоставляются ОТЧЁТНЫЕ ДОКУМЕНТЫ по требованию.
+▪️Размещение без животных❗️
+
+⛔️ ЗАПРЕЩЕНО: КУРИТЬ, ПРОВОДИТЬ ВЕЧЕРИНКИ ❗️
+При нарушении - залог не возвращается❗️
+"""
 
     await message.answer(text)
 
 # =====================================================
-# ЗАПУСК TELEGRAM
+# ADMIN PANEL
+# =====================================================
+
+@dp.message(lambda m: m.text == "🛠 Админка")
+async def admin_panel(message: types.Message):
+
+    if message.from_user.id not in ADMIN_IDS:
+
+        return
+
+    bookings = load_bookings()
+
+    if not bookings:
+
+        await message.answer("Броней пока нет")
+
+        return
+
+    text = "📋 ВСЕ БРОНИ\n\n"
+
+    for b in bookings:
+
+        text += f"""
+ID: {b['id']}
+
+{b['checkin']} → {b['checkout']}
+
+{b['nights']} ночей
+
+{b['total']}€
+
+Статус:
+{BOOKING_STATUSES.get(b['status'])}
+
+-----------------------
+
+"""
+
+    await message.answer(text)
+
+# =====================================================
+# CONFIRM
+# =====================================================
+
+@dp.callback_query(lambda c: c.data.startswith("confirm_"))
+async def confirm_booking(callback: CallbackQuery):
+
+    booking_id = callback.data.split("_")[1]
+
+    bookings = load_bookings()
+
+    for booking in bookings:
+
+        if booking["id"] == booking_id:
+
+            booking["status"] = "confirmed"
+
+    save_bookings(bookings)
+
+    await callback.message.edit_text(
+        f"✅ Бронь {booking_id} подтверждена"
+    )
+
+    await callback.answer("Подтверждено")
+
+# =====================================================
+# CANCEL
+# =====================================================
+
+@dp.callback_query(lambda c: c.data.startswith("cancel_"))
+async def cancel_booking(callback: CallbackQuery):
+
+    booking_id = callback.data.split("_")[1]
+
+    bookings = load_bookings()
+
+    for booking in bookings:
+
+        if booking["id"] == booking_id:
+
+            booking["status"] = "cancelled"
+
+    save_bookings(bookings)
+
+    await callback.message.edit_text(
+        f"❌ Бронь {booking_id} отменена"
+    )
+
+    await callback.answer("Отменено")
+
+# =====================================================
+# START BOT
 # =====================================================
 
 async def start_bot():
 
-    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.delete_webhook(
+        drop_pending_updates=True
+    )
 
     await dp.start_polling(bot)
 
