@@ -26,7 +26,7 @@ from aiogram.types import (
 # CONFIG
 # ==================================================
 
-BOT_TOKEN = os.environ["8770383990:AAE3mqsQtIxbPE5YrntEz-Y4Jfc-93ezuGc"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 ADMIN_IDS = [
     1008661058,
