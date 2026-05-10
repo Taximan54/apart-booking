@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import (
     Message,
@@ -19,7 +19,9 @@ from aiogram.types import (
     CallbackQuery,
     ReplyKeyboardMarkup,
     KeyboardButton,
-    WebAppInfo
+    WebAppInfo,
+    FSInputFile,
+    InputMediaPhoto
 )
 
 # ==================================================
@@ -38,6 +40,12 @@ PRICE_PER_NIGHT = 70
 DB_NAME = "bookings.db"
 
 SITE_URL = "https://apart-booking-production.up.railway.app"
+
+PHOTOS = [
+    "static/images/1.JPG",
+    "static/images/2.JPG",
+    "static/images/3.JPG"
+]
 
 # ==================================================
 # FASTAPI
@@ -342,7 +350,36 @@ def booking_keyboard(booking_id):
     )
 
 # ==================================================
-# TELEGRAM START
+# PHOTOS
+# ==================================================
+
+async def send_photos(message):
+
+    media = []
+
+    for i, photo in enumerate(PHOTOS):
+
+        if i == 0:
+
+            media.append(
+                InputMediaPhoto(
+                    media=FSInputFile(photo),
+                    caption="🏠 ONE APART"
+                )
+            )
+
+        else:
+
+            media.append(
+                InputMediaPhoto(
+                    media=FSInputFile(photo)
+                )
+            )
+
+    await message.answer_media_group(media)
+
+# ==================================================
+# START
 # ==================================================
 
 @dp.message(Command("start"))
@@ -362,6 +399,18 @@ async def start(message: Message):
 
             [
                 KeyboardButton(
+                    text="📸 Фото квартиры"
+                )
+            ],
+
+            [
+                KeyboardButton(
+                    text="📋 Описание квартиры"
+                )
+            ],
+
+            [
+                KeyboardButton(
                     text="📞 Связаться"
                 )
             ]
@@ -375,15 +424,13 @@ async def start(message: Message):
     )
 
 # ==================================================
-# ADMIN PANEL
+# ADMIN
 # ==================================================
 
 @dp.message(Command("admin"))
 async def admin(message: Message):
 
-    if not is_admin(
-        message.from_user.id
-    ):
+    if not is_admin(message.from_user.id):
 
         await message.answer(
             "Нет доступа"
@@ -397,6 +444,38 @@ async def admin(message: Message):
     )
 
 # ==================================================
+# PHOTOS BUTTON
+# ==================================================
+
+@dp.message(F.text == "📸 Фото квартиры")
+async def photos(message: Message):
+
+    await send_photos(message)
+
+# ==================================================
+# DESCRIPTION
+# ==================================================
+
+@dp.message(F.text == "📋 Описание квартиры")
+async def description(message: Message):
+
+    await message.answer(
+        "Квартира комфорт и премиум класса в Новосибирске.\n\n"
+        "Панорамный вид, дизайнерский интерьер, метро рядом."
+    )
+
+# ==================================================
+# CONTACT
+# ==================================================
+
+@dp.message(F.text == "📞 Связаться")
+async def contact(message: Message):
+
+    await message.answer(
+        "Напишите администратору."
+    )
+
+# ==================================================
 # BOOKINGS
 # ==================================================
 
@@ -407,9 +486,7 @@ async def bookings_callback(
     callback: CallbackQuery
 ):
 
-    if not is_admin(
-        callback.from_user.id
-    ):
+    if not is_admin(callback.from_user.id):
 
         await callback.answer(
             "Нет доступа",
@@ -456,9 +533,7 @@ async def stats_callback(
     callback: CallbackQuery
 ):
 
-    if not is_admin(
-        callback.from_user.id
-    ):
+    if not is_admin(callback.from_user.id):
 
         await callback.answer(
             "Нет доступа",
@@ -491,9 +566,7 @@ async def delete_callback(
     callback: CallbackQuery
 ):
 
-    if not is_admin(
-        callback.from_user.id
-    ):
+    if not is_admin(callback.from_user.id):
 
         await callback.answer(
             "Нет доступа",
@@ -524,17 +597,6 @@ async def delete_callback(
         )
 
     await callback.answer()
-
-# ==================================================
-# CONTACT
-# ==================================================
-
-@dp.message(lambda m: m.text == "📞 Связаться")
-async def contact(message: Message):
-
-    await message.answer(
-        "Напишите администратору"
-    )
 
 # ==================================================
 # STARTUP
