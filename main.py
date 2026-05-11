@@ -989,112 +989,6 @@ async def apartment_description(message: types.Message):
     await message.answer(text)
 
 # =====================================================
-# ADMIN PANEL
-# =====================================================
-
-@dp.message(lambda m: m.text == "🛠 Админка")
-async def admin_panel(message: types.Message):
-
-    if message.from_user.id not in ADMIN_IDS:
-
-        return
-
-    bookings = load_bookings()
-
-    if not bookings:
-
-        await message.answer("Броней пока нет")
-
-        return
-
-    text = "📋 ВСЕ БРОНИ\n\n"
-
-    for b in bookings:
-
-        text += f"""
-ID: {b['id']}
-
-{b['checkin']} → {b['checkout']}
-
-{b['nights']} ночей
-
-{b['total']}€
-
-Статус:
-{BOOKING_STATUSES.get(b['status'])}
-
------------------------
-
-"""
-
-    await message.answer(text)
-
-# =====================================================
-# CONFIRM
-# =====================================================
-
-@dp.callback_query(lambda c: c.data.startswith("confirm_"))
-async def confirm_booking(callback: CallbackQuery):
-
-    booking_id = callback.data.split("_")[1]
-
-    bookings = load_bookings()
-
-    for booking in bookings:
-
-        if booking["id"] == booking_id:
-
-            booking["status"] = "confirmed"
-
-    save_bookings(bookings)
-
-    await callback.message.edit_text(
-        f"✅ Бронь {booking_id} подтверждена"
-    )
-
-    await callback.answer("Подтверждено")
-
-# =====================================================
-# CANCEL
-# =====================================================
-
-@dp.callback_query(lambda c: c.data.startswith("cancel_"))
-async def cancel_booking(callback: CallbackQuery):
-
-    booking_id = callback.data.split("_")[1]
-
-    bookings = load_bookings()
-
-    for booking in bookings:
-
-        if booking["id"] == booking_id:
-
-            booking["status"] = "cancelled"
-
-    save_bookings(bookings)
-
-    await callback.message.edit_text(
-        f"❌ Бронь {booking_id} отменена"
-    )
-
-    await callback.answer("Отменено")
-
-# =====================================================
-# START BOT
-# =====================================================
-
-async def start_bot():
-
-    await bot.delete_webhook(
-        drop_pending_updates=True
-    )
-
-    await dp.start_polling(bot)
-
-# =====================================================
-# FASTAPI STARTUP
-# =====================================================
-# =====================================================
 # АДМИНКА
 # =====================================================
 
@@ -1135,6 +1029,10 @@ async def admin_panel(message: types.Message):
 
             [
                 KeyboardButton(text="🧹 Очистить брони")
+            ],
+
+            [
+                KeyboardButton(text="🏠 Главное меню")
             ]
 
         ],
@@ -1160,19 +1058,25 @@ async def all_bookings(message: types.Message):
     bookings = load_bookings()
 
     if not bookings:
+
         await message.answer("Броней пока нет")
         return
 
-    text = "📋 Все брони:\n\n"
+    text = "📋 ВСЕ БРОНИ\n\n"
 
     for b in bookings:
 
-        text += (
-            f"ID: {b['id']}\n"
-            f"{b['checkin']} → {b['checkout']}\n"
-            f"{b['nights']} ночей\n"
-            f"{b['total']}€\n\n"
-        )
+        text += f"""
+ID: {b['id']}
+
+📅 {b['checkin']} → {b['checkout']}
+
+🌙 Ночей: {b['nights']}
+
+💰 Сумма: {b['total']}€
+
+————————————
+"""
 
     await message.answer(text)
 
@@ -1198,18 +1102,17 @@ async def stats(message: types.Message):
         b["nights"] for b in bookings
     )
 
-    await message.answer(
+    text = f"""
+📊 СТАТИСТИКА
 
-        f"""
-📊 Статистика
+📋 Броней: {total_bookings}
 
-Броней: {total_bookings}
+🌙 Ночей: {total_nights}
 
-Ночей: {total_nights}
-
-Доход: {total_income}€
+💰 Доход: {total_income}€
 """
-    )
+
+    await message.answer(text)
 
 # =====================================================
 # ДОХОД
@@ -1223,11 +1126,48 @@ async def income(message: types.Message):
 
     bookings = load_bookings()
 
-    total = sum(b["total"] for b in bookings)
+    total = sum(
+        b["total"] for b in bookings
+    )
 
     await message.answer(
         f"💰 Общий доход: {total}€"
     )
+
+# =====================================================
+# ПОСЛЕДНИЕ БРОНИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "🕒 Последние брони")
+async def latest_bookings(message: types.Message):
+
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    bookings = load_bookings()
+
+    if not bookings:
+
+        await message.answer("Броней нет")
+        return
+
+    latest = bookings[-5:]
+
+    text = "🕒 Последние брони\n\n"
+
+    for b in latest:
+
+        text += f"""
+ID: {b['id']}
+
+📅 {b['checkin']} → {b['checkout']}
+
+💰 {b['total']}€
+
+————————————
+"""
+
+    await message.answer(text)
 
 # =====================================================
 # КЛИЕНТЫ
@@ -1246,36 +1186,7 @@ async def clients(message: types.Message):
     )
 
 # =====================================================
-# ПОСЛЕДНИЕ БРОНИ
-# =====================================================
-
-@dp.message(lambda m: m.text == "🕒 Последние брони")
-async def latest_bookings(message: types.Message):
-
-    if message.from_user.id not in ADMIN_IDS:
-        return
-
-    bookings = load_bookings()
-
-    if not bookings:
-        await message.answer("Броней нет")
-        return
-
-    latest = bookings[-5:]
-
-    text = "🕒 Последние брони:\n\n"
-
-    for b in reversed(latest):
-
-        text += (
-            f"{b['checkin']} → {b['checkout']}\n"
-            f"{b['total']}€\n\n"
-        )
-
-    await message.answer(text)
-
-# =====================================================
-# ОЧИСТИТЬ БРОНИ
+# ОЧИСТКА БРОНЕЙ
 # =====================================================
 
 @dp.message(lambda m: m.text == "🧹 Очистить брони")
@@ -1287,7 +1198,7 @@ async def clear_bookings(message: types.Message):
     save_bookings([])
 
     await message.answer(
-        "🧹 Все брони удалены"
+        "🧹 Все брони очищены"
     )
 
 # =====================================================
