@@ -1444,5 +1444,49 @@ async def process_price(message: types.Message):
         )
 @app.on_event("startup")
 async def startup_event():
+@dp.message(lambda m: m.text == "🏠 Главное меню")
+async def back_menu(message: types.Message):
+
+    keyboard = ReplyKeyboardMarkup(
+
+        keyboard=[
+
+            [
+                KeyboardButton(
+                    text="📅 Забронировать",
+                    web_app=WebAppInfo(
+                        url="https://apart-booking-production.up.railway.app"
+                    )
+                )
+            ],
+
+            [
+                KeyboardButton(text="📸 Фото квартиры")
+            ],
+
+            [
+                KeyboardButton(text="📋 Описание квартиры")
+            ],
+
+            [
+                KeyboardButton(text="🛠 Админка")
+            ]
+
+        ],
+
+        resize_keyboard=True
+    )
+
+    await message.answer(
+        "🏠 Главное меню",
+        reply_markup=keyboard
+    )
+
+# =====================================================
+# FASTAPI STARTUP
+# =====================================================
+
+@app.on_event("startup")
+async def startup_event():
 
     asyncio.create_task(start_bot())
