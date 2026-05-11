@@ -1205,12 +1205,10 @@ async def clear_bookings(message: types.Message):
 # СОСТОЯНИЯ АДМИНКИ
 # =====================================================
 
-admin_delete_mode = {}
-admin_block_mode = {}
-admin_unblock_mode = {}
+admin_state = {}
 
 # =====================================================
-# УДАЛЕНИЕ БРОНИ
+# УДАЛИТЬ БРОНЬ
 # =====================================================
 
 @dp.message(lambda m: m.text == "❌ Удалить бронь")
@@ -1219,53 +1217,58 @@ async def delete_booking_start(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         return
 
-    admin_delete_mode[message.from_user.id] = True
+    bookings = load_bookings()
 
-    await message.answer(
-        "Введите ID брони для удаления"
-    )
+    if not bookings:
 
-@dp.message()
-async def delete_booking_process(message: types.Message):
-
-    user_id = message.from_user.id
-
-    if user_id not in admin_delete_mode:
+        await message.answer("Броней нет")
         return
 
-    booking_id = message.text.strip()
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[]
+    )
+
+    for b in bookings:
+
+        keyboard.inline_keyboard.append([
+
+            InlineKeyboardButton(
+                text=f"{b['checkin']} → {b['checkout']}",
+                callback_data=f"delete_{b['id']}"
+            )
+
+        ])
+
+    await message.answer(
+        "Выберите бронь для удаления",
+        reply_markup=keyboard
+    )
+
+# =====================================================
+# CALLBACK УДАЛЕНИЕ
+# =====================================================
+
+@dp.callback_query(lambda c: c.data.startswith("delete_"))
+async def delete_booking_callback(callback: CallbackQuery):
+
+    booking_id = callback.data.replace("delete_", "")
 
     bookings = load_bookings()
 
     new_bookings = []
 
-    deleted = False
-
     for b in bookings:
 
-        if b["id"] == booking_id:
-
-            deleted = True
-
-        else:
-
+        if b["id"] != booking_id:
             new_bookings.append(b)
 
-    if deleted:
+    save_bookings(new_bookings)
 
-        save_bookings(new_bookings)
+    await callback.message.answer(
+        f"✅ Бронь {booking_id} удалена"
+    )
 
-        await message.answer(
-            f"✅ Бронь {booking_id} удалена"
-        )
-
-    else:
-
-        await message.answer(
-            "❌ Бронь не найдена"
-        )
-
-    del admin_delete_mode[user_id]
+    await callback.answer()
 
 # =====================================================
 # БЛОКИРОВКА ДАТ
@@ -1277,55 +1280,14 @@ async def block_dates_start(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         return
 
-    admin_block_mode[message.from_user.id] = True
+    admin_state[message.from_user.id] = "block"
 
     await message.answer(
         "Введите даты:\n\n2025-07-10 2025-07-15"
     )
 
-@dp.message()
-async def block_dates_process(message: types.Message):
-
-    user_id = message.from_user.id
-
-    if user_id not in admin_block_mode:
-        return
-
-    try:
-
-        parts = message.text.split()
-
-        checkin = parts[0]
-        checkout = parts[1]
-
-        bookings = load_bookings()
-
-        booking = {
-            "id": "BLOCKED",
-            "checkin": checkin,
-            "checkout": checkout,
-            "nights": 0,
-            "total": 0
-        }
-
-        bookings.append(booking)
-
-        save_bookings(bookings)
-
-        await message.answer(
-            f"🔒 Даты заблокированы:\n{checkin} → {checkout}"
-        )
-
-    except:
-
-        await message.answer(
-            "❌ Ошибка формата"
-        )
-
-    del admin_block_mode[user_id]
-
 # =====================================================
-# РАЗБЛОКИРОВКА ДАТ
+# РАЗБЛОКИРОВКА
 # =====================================================
 
 @dp.message(lambda m: m.text == "🔓 Разблокировать даты")
@@ -1334,53 +1296,124 @@ async def unblock_dates_start(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         return
 
-    admin_unblock_mode[message.from_user.id] = True
+    bookings = load_bookings()
 
-    await message.answer(
-        "Введите дату заезда блокировки\n\nНапример:\n2025-07-10"
-    )
+    blocked = [
+        b for b in bookings
+        if b["id"] == "BLOCKED"
+    ]
 
-@dp.message()
-async def unblock_dates_process(message: types.Message):
+    if not blocked:
 
-    user_id = message.from_user.id
+        await message.answer(
+            "Нет блокировок"
+        )
 
-    if user_id not in admin_unblock_mode:
         return
 
-    checkin = message.text.strip()
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[]
+    )
+
+    for b in blocked:
+
+        keyboard.inline_keyboard.append([
+
+            InlineKeyboardButton(
+                text=f"{b['checkin']} → {b['checkout']}",
+                callback_data=f"unblock_{b['checkin']}"
+            )
+
+        ])
+
+    await message.answer(
+        "Выберите блокировку",
+        reply_markup=keyboard
+    )
+
+# =====================================================
+# CALLBACK РАЗБЛОКИРОВКА
+# =====================================================
+
+@dp.callback_query(lambda c: c.data.startswith("unblock_"))
+async def unblock_callback(callback: CallbackQuery):
+
+    checkin = callback.data.replace(
+        "unblock_",
+        ""
+    )
 
     bookings = load_bookings()
 
     new_bookings = []
 
-    removed = False
-
     for b in bookings:
 
-        if b["id"] == "BLOCKED" and b["checkin"] == checkin:
-
-            removed = True
-
-        else:
-
+        if not (
+            b["id"] == "BLOCKED"
+            and b["checkin"] == checkin
+        ):
             new_bookings.append(b)
 
     save_bookings(new_bookings)
 
-    if removed:
+    await callback.message.answer(
+        "🔓 Блокировка удалена"
+    )
 
-        await message.answer(
-            "🔓 Блокировка удалена"
-        )
+    await callback.answer()
 
-    else:
+# =====================================================
+# ОБРАБОТКА СОСТОЯНИЙ
+# =====================================================
 
-        await message.answer(
-            "❌ Блокировка не найдена"
-        )
+@dp.message()
+async def admin_states(message: types.Message):
 
-    del admin_unblock_mode[user_id]
+    user_id = message.from_user.id
+
+    if user_id not in admin_state:
+        return
+
+    state = admin_state[user_id]
+
+    # БЛОКИРОВКА
+
+    if state == "block":
+
+        try:
+
+            parts = message.text.split()
+
+            checkin = parts[0]
+            checkout = parts[1]
+
+            bookings = load_bookings()
+
+            bookings.append({
+
+                "id": "BLOCKED",
+                "checkin": checkin,
+                "checkout": checkout,
+                "nights": 0,
+                "total": 0,
+                "status": "blocked"
+
+            })
+
+            save_bookings(bookings)
+
+            await message.answer(
+                f"🔒 Даты заблокированы\n\n{checkin} → {checkout}"
+            )
+
+        except:
+
+            await message.answer(
+                "❌ Неверный формат"
+            )
+
+    del admin_state[user_id]
 
 # =====================================================
 # КНОПКА НАЗАД
