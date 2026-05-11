@@ -1367,7 +1367,7 @@ async def unblock_callback(callback: CallbackQuery):
 # ОБРАБОТКА СОСТОЯНИЙ
 # =====================================================
 
-@dp.message()
+@dp.message(lambda m: m.from_user.id in admin_state)
 async def admin_states(message: types.Message):
 
     user_id = message.from_user.id
