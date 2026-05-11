@@ -1202,6 +1202,187 @@ async def clear_bookings(message: types.Message):
     )
 
 # =====================================================
+# СОСТОЯНИЯ АДМИНКИ
+# =====================================================
+
+admin_delete_mode = {}
+admin_block_mode = {}
+admin_unblock_mode = {}
+
+# =====================================================
+# УДАЛЕНИЕ БРОНИ
+# =====================================================
+
+@dp.message(lambda m: m.text == "❌ Удалить бронь")
+async def delete_booking_start(message: types.Message):
+
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    admin_delete_mode[message.from_user.id] = True
+
+    await message.answer(
+        "Введите ID брони для удаления"
+    )
+
+@dp.message()
+async def delete_booking_process(message: types.Message):
+
+    user_id = message.from_user.id
+
+    if user_id not in admin_delete_mode:
+        return
+
+    booking_id = message.text.strip()
+
+    bookings = load_bookings()
+
+    new_bookings = []
+
+    deleted = False
+
+    for b in bookings:
+
+        if b["id"] == booking_id:
+
+            deleted = True
+
+        else:
+
+            new_bookings.append(b)
+
+    if deleted:
+
+        save_bookings(new_bookings)
+
+        await message.answer(
+            f"✅ Бронь {booking_id} удалена"
+        )
+
+    else:
+
+        await message.answer(
+            "❌ Бронь не найдена"
+        )
+
+    del admin_delete_mode[user_id]
+
+# =====================================================
+# БЛОКИРОВКА ДАТ
+# =====================================================
+
+@dp.message(lambda m: m.text == "📅 Заблокировать даты")
+async def block_dates_start(message: types.Message):
+
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    admin_block_mode[message.from_user.id] = True
+
+    await message.answer(
+        "Введите даты:\n\n2025-07-10 2025-07-15"
+    )
+
+@dp.message()
+async def block_dates_process(message: types.Message):
+
+    user_id = message.from_user.id
+
+    if user_id not in admin_block_mode:
+        return
+
+    try:
+
+        parts = message.text.split()
+
+        checkin = parts[0]
+        checkout = parts[1]
+
+        bookings = load_bookings()
+
+        booking = {
+            "id": "BLOCKED",
+            "checkin": checkin,
+            "checkout": checkout,
+            "nights": 0,
+            "total": 0
+        }
+
+        bookings.append(booking)
+
+        save_bookings(bookings)
+
+        await message.answer(
+            f"🔒 Даты заблокированы:\n{checkin} → {checkout}"
+        )
+
+    except:
+
+        await message.answer(
+            "❌ Ошибка формата"
+        )
+
+    del admin_block_mode[user_id]
+
+# =====================================================
+# РАЗБЛОКИРОВКА ДАТ
+# =====================================================
+
+@dp.message(lambda m: m.text == "🔓 Разблокировать даты")
+async def unblock_dates_start(message: types.Message):
+
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    admin_unblock_mode[message.from_user.id] = True
+
+    await message.answer(
+        "Введите дату заезда блокировки\n\nНапример:\n2025-07-10"
+    )
+
+@dp.message()
+async def unblock_dates_process(message: types.Message):
+
+    user_id = message.from_user.id
+
+    if user_id not in admin_unblock_mode:
+        return
+
+    checkin = message.text.strip()
+
+    bookings = load_bookings()
+
+    new_bookings = []
+
+    removed = False
+
+    for b in bookings:
+
+        if b["id"] == "BLOCKED" and b["checkin"] == checkin:
+
+            removed = True
+
+        else:
+
+            new_bookings.append(b)
+
+    save_bookings(new_bookings)
+
+    if removed:
+
+        await message.answer(
+            "🔓 Блокировка удалена"
+        )
+
+    else:
+
+        await message.answer(
+            "❌ Блокировка не найдена"
+        )
+
+    del admin_unblock_mode[user_id]
+
+# =====================================================
 # КНОПКА НАЗАД
 # =====================================================
 
